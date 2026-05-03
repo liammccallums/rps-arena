@@ -160,6 +160,13 @@ contract Match {
         delete player2;
 
         status = GameStatus.Matchmaking;
+
+        // Notifies Manager Match has ended
+        Manager(manager).notifyMatchEnded(
+            player1.addr,
+            player2.addr
+        );
+
     }
 
     function ResetMoves() internal {
