@@ -7,7 +7,9 @@ contract Match {
     //State-Variables:
     //Queue
     //Current game player1, player 2
-
+    constructor(
+        address _managerAddress
+    ) {}
     //Functions:
     //InitializeLobby() - starts up the queue and moves to matchmaking status.
     //QueueCheck() - waits for two players to match up.
