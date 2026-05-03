@@ -3,21 +3,31 @@ pragma solidity ^0.8.0;
 
 contract Match {
 
+    address public manager;
+
     constructor(
-    address _managerAddress
-    ) {}
+        address _managerAddress
+    ) {
+        manager = _managerAddress;
+        status = GameStatus.Initializing;
+    }
+
+    modifier onlyManager() {
+        require(msg.sender == manager, "Only manager");
+        _;
+    }
     
     // Game status: Initializing, Matchmaking (not enough players), Started (starts the game, adds player details), WaitingForMoves, JudgingMoves, ScoreCheck, Resolving.
     enum GameStatus {
         Initializing,
-        Mathmaking,
+        Matchmaking,
         Started,
         WaitingForMoves,
         JudgingMoves,
         Resolving
     }
 
-    enum MoveType {
+    enum Move {
         None,
         Rock,
         Paper,
@@ -26,11 +36,16 @@ contract Match {
     
     struct Player {
         address addr;
-        int score;
+        uint256 score;
         Move move;
     }
 
     //State-Variables:
+
+    GameStatus public status;
+
+    uint256 public roundStartTime;
+    uint256 public constant MOVE_TIMEOUT = 10 seconds;
 
     //Queue 
     address[] public queue;
@@ -43,14 +58,14 @@ contract Match {
 
     //InitializeLobby() - starts up the queue and moves to matchmaking status.
 
-    function initializeLobby() external {
+    function initializeLobby() external onlyManager {
         require(status == GameStatus.Initializing, "Already initialized");
         status = GameStatus.Matchmaking;
     }
 
     //AddToQueue() - Called by manager. Adds player to queue.
 
-    function addToQueue(address _player) external {
+    function addToQueue(address _player) external onlyManager {
         queue.push(_player);
     }
 
@@ -62,7 +77,7 @@ contract Match {
 
     //CreateMatch() - matches two players and adds their details to state variables.
     
-    function CreateMatch() external {
+    function CreateMatch() external onlyManager {
         require(queue.length >= 2, "Not enough players");
 
         player1 = Player(queue[0], 0, Move.None);
@@ -70,6 +85,7 @@ contract Match {
 
         delete queue;
         roundStartTime = block.timestamp;
+        status = GameStatus.WaitingForMoves;
     }
 
     //WaitForMove() - waits for two players to make their moves, timer for 10sec.
@@ -78,54 +94,57 @@ contract Match {
         return block.timestamp <= roundStartTime + MOVE_TIMEOUT;
     }
 
-
     //CommitMove() - adds players move to their obj.
 
     function CommitMove(Move _move) external {
         require(_move != Move.None, "Invalid move");
 
-        if (msg.sender == player1._addr) {
-            require(player1._move == Move.None, "Already moved");
-            player1._move = _move;
-        } else if (msg.sender == player2._addr) {
-            require(player2._move == Move.None, "Already moved");
-            player2._move = _move;
+        if (msg.sender == player1.addr) {
+            require(player1.move == Move.None, "Already moved");
+            player1.move = _move;
+        } else if (msg.sender == player2.addr) {
+            require(player2.move == Move.None, "Already moved");
+            player2.move = _move;
         } else {
             revert("Not a player");
         }
     }
+
     //
     //JudgeMoves() - judges the two moves to see who won and adds points to winner score.
 
-    function JudgeMoves() external {
+    function JudgeMoves() external onlyManager {
         require(
-            player1._move != Move.None && player2._move != Move.None,
+            player1.move != Move.None && player2.move != Move.None,
             "No moves submitted"
         );
 
-        if (player1._move == player2._move) {
+        if (player1.move == player2.move) {
             ResetMoves();
             return;
         }
 
         bool player1Wins =
-            (player1._move == Move.Rock && player2._move == Move.Scissors) ||
-            (player1._move == Move.Paper && player2._move == Move.Rock) ||
-            (player1._move == Move.Scissors && player2._move == Move.Paper);
+            (player1.move == Move.Rock && player2.move == Move.Scissors) ||
+            (player1.move == Move.Paper && player2.move == Move.Rock) ||
+            (player1.move == Move.Scissors && player2.move == Move.Paper);
 
         if (player1Wins) {
             player1.score++;
         } else {
             player2.score++;
         }
+
+        CheckScore();
     }
+
     //CheckScore() - checks the players score to see if a player has won.
 
     function CheckScore() internal {
         if (player1.score >= 2) {
-            ResolveRound(player1._addr);
+            ResolveRound(player1.addr);
         } else if (player2.score >= 2) {
-            ResolveRound(player2._addr);
+            ResolveRound(player2.addr);
         } else {
             ResetMoves();
         }
@@ -139,11 +158,17 @@ contract Match {
 
         delete player1;
         delete player2;
+
+        status = GameStatus.Matchmaking;
     }
 
     function ResetMoves() internal {
-        player1._move = Move.None;
-        player2._move = Move.None;
+        player1.move = Move.None;
+        player2.move = Move.None;
         roundStartTime = block.timestamp;
+        status = GameStatus.WaitingForMoves;
     }
+
+    receive() external payable {}
 }
+
