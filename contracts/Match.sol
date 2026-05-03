@@ -5,7 +5,7 @@ contract Match {
     // Game status: Initializing, Matchmaking (not enough players), Started (starts the game, adds player details), WaitingForMoves, JudgingMoves, ScoreCheck, Resolving.
 
     //State-Variables:
-    //Queue 
+    //Queue
     //Current game player1, player 2
 
     //Functions:

@@ -1,0 +1,167 @@
+{
+	"compiler": {
+		"version": "0.8.34+commit.80d5c536"
+	},
+	"language": "Solidity",
+	"output": {
+		"abi": [
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "address",
+						"name": "matchAddress",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "index",
+						"type": "uint256"
+					}
+				],
+				"name": "MatchCreated",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "address",
+						"name": "player",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "address",
+						"name": "matchAddress",
+						"type": "address"
+					}
+				],
+				"name": "PlayerAssigned",
+				"type": "event"
+			},
+			{
+				"inputs": [],
+				"name": "assignPlayer",
+				"outputs": [],
+				"stateMutability": "payable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"name": "globalQueue",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "_fee",
+						"type": "uint256"
+					}
+				],
+				"name": "initializeMatches",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"name": "matches",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "matchAddress",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "entryFee",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "currentPlayers",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			}
+		],
+		"devdoc": {
+			"kind": "dev",
+			"methods": {},
+			"version": 1
+		},
+		"userdoc": {
+			"kind": "user",
+			"methods": {
+				"assignPlayer()": {
+					"notice": "Logic to find the best match for a player"
+				},
+				"initializeMatches(uint256)": {
+					"notice": "Deploys 3 Match contracts and stores their info"
+				}
+			},
+			"version": 1
+		}
+	},
+	"settings": {
+		"compilationTarget": {
+			"contracts/Manager.sol": "Manager"
+		},
+		"evmVersion": "osaka",
+		"libraries": {},
+		"metadata": {
+			"bytecodeHash": "ipfs"
+		},
+		"optimizer": {
+			"enabled": false,
+			"runs": 200
+		},
+		"remappings": []
+	},
+	"sources": {
+		"contracts/Manager.sol": {
+			"keccak256": "0xe0513bcf1588c845078172fb3531a6c694e8b31776a87b622c6696dcdca00fc7",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://4ca4a3d7f0f86d2967bfd0c2ab89dd5ea13b6511a207f976259cfa87b312785e",
+				"dweb:/ipfs/QmVp54XvnuuAQL5FXhZMqDqiSFzge9VwAfccaEbnf6vg5g"
+			]
+		},
+		"contracts/Match.sol": {
+			"keccak256": "0x05253a8ca5795c8edaff2008d7d93b1ce23717234d6ff2ad7d05ba3e606ebfd5",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://d548aa0f22da27398e158dcd82b2643ef2afd3c423a78ef108ec9ec3074ef17f",
+				"dweb:/ipfs/QmP5zWrYXuNTxiqPD6XfsWsJgkJjRtT3DQSKVWXaLSD1oq"
+			]
+		}
+	},
+	"version": 1
+}
