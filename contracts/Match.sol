@@ -41,7 +41,6 @@ contract Match {
     }
 
     //State-Variables:
-
     GameStatus public status;
 
     uint256 public roundStartTime;
@@ -55,28 +54,23 @@ contract Match {
     Player public player2;
 
     //Functions:
-
     //InitializeLobby() - starts up the queue and moves to matchmaking status.
-
     function initializeLobby() external onlyManager {
         require(status == GameStatus.Initializing, "Already initialized");
         status = GameStatus.Matchmaking;
     }
 
     //AddToQueue() - Called by manager. Adds player to queue.
-
     function addToQueue(address _player) external onlyManager {
         queue.push(_player);
     }
 
     //QueueCheck() - waits for two players to match up.
-    
     function QueueCheck() public view returns (bool) {
         return queue.length >= 2;
     }
 
     //CreateMatch() - matches two players and adds their details to state variables.
-    
     function CreateMatch() external onlyManager {
         require(queue.length >= 2, "Not enough players");
 
@@ -89,13 +83,11 @@ contract Match {
     }
 
     //WaitForMove() - waits for two players to make their moves, timer for 10sec.
-
     function WaitForMove() public view returns (bool) {
         return block.timestamp <= roundStartTime + MOVE_TIMEOUT;
     }
 
     //CommitMove() - adds players move to their obj.
-
     function CommitMove(Move _move) external {
         require(_move != Move.None, "Invalid move");
 
@@ -112,7 +104,6 @@ contract Match {
 
     //
     //JudgeMoves() - judges the two moves to see who won and adds points to winner score.
-
     function JudgeMoves() external onlyManager {
         require(
             player1.move != Move.None && player2.move != Move.None,
@@ -139,7 +130,6 @@ contract Match {
     }
 
     //CheckScore() - checks the players score to see if a player has won.
-
     function CheckScore() internal {
         if (player1.score >= 2) {
             ResolveRound(player1.addr);
@@ -152,7 +142,6 @@ contract Match {
 
     //ResolveRound() - if player has won, assign their eth reward and reset match variables for next game, send players back to manager.
     //               - if player has not won, reset moves and start the next round.
-
     function ResolveRound(address winner) internal {
         payable(winner).transfer(address(this).balance);
 
@@ -178,4 +167,3 @@ contract Match {
 
     receive() external payable {}
 }
-
