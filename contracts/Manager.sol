@@ -1,97 +1,130 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./Match.sol"; // Ensure Match.sol is in the same directory
+import "./Match.sol";
 
 contract Manager {
+    address public immutable admin;
 
-    address public admin;
-
-    constructor() {
-        admin = msg.sender;
-    }
-
-    // Mapping to verify if an address is an authorized Match contract
-    mapping(address => bool) public isAuthorizedMatch;
+    uint256 public constant ENTRY_FEE = 1 ether;
+    uint256 public constant MATCH_POOL_SIZE = 3;
 
     struct MatchInfo {
         address matchAddress;
         uint256 entryFee;
-        uint256 currentPlayers; // Tracks how many are currently in that specific match
+        uint256 currentPlayers;
     }
 
     MatchInfo[] public matches;
-    address[] public globalQueue;
+
+    mapping(address => bool) public isAuthorizedMatch;
+    mapping(address => bool) public activePlayer;
 
     event MatchCreated(address matchAddress, uint256 index);
     event PlayerAssigned(address player, address matchAddress);
-    event PlayersReturned(address p1, address p2);
+    event PlayersReturned(address player1, address player2);
 
-    /// Deploys 3 Match contracts and stores their info
-    function initializeMatches(uint256 _fee) external {
-    require(matches.length == 0, "Already initialized");
-    
-    for (uint i = 0; i < 3; i++) {
-        // Pass 'address(this)' so the Match knows who the Manager is
-        Match newMatch = new Match(address(this)); 
-        address matchAddr = address(newMatch);
-        
-        matches.push(MatchInfo({
-            matchAddress: matchAddr,
-            entryFee: _fee,
-            currentPlayers: 0
-        }));
+    constructor() {
+        admin = msg.sender;
 
-        isAuthorizedMatch[matchAddr] = true; 
+        // Automatically deploy and initialise the Match contracts
+        // when the Manager contract is deployed.
+        _initializeMatches();
     }
-}
 
-    /// Logic to find the best match for a player
-    function assignPlayer() external payable {
-        // 1. Basic validation (e.g. check entry fee)
-        // 2. Find the match with 1 player (waiting for a pair) or the smallest queue
+    // Deploys a fixed pool of Match contracts with a 1 ETH entry fee.
+    function _initializeMatches() internal {
+        require(matches.length == 0, "Already initialized");
 
-        uint256 targetIndex = 0;
-        uint256 minPlayers = matches[0].currentPlayers;
+        for (uint256 i = 0; i < MATCH_POOL_SIZE; i++) {
+            Match newMatch = new Match(address(this));
+            newMatch.initializeLobby();
 
-        for (uint i = 0; i < matches.length; i++) {
-            // Ideal scenario: Someone is waiting alone (1 player)
-            if (matches[i].currentPlayers == 1) {
-                targetIndex = i;
-                break;
-            }
-            // Fallback: Find the emptiest match
-            if (matches[i].currentPlayers < minPlayers) {
-                minPlayers = matches[i].currentPlayers;
-                targetIndex = i;
-            }
+            address matchAddr = address(newMatch);
+
+            matches.push(MatchInfo({
+                matchAddress: matchAddr,
+                entryFee: ENTRY_FEE,
+                currentPlayers: 0
+            }));
+
+            isAuthorizedMatch[matchAddr] = true;
+
+            emit MatchCreated(matchAddr, i);
         }
-
-        // Update the state and "send" player info to the Match contract
-        matches[targetIndex].currentPlayers += 1;
-
-        // Call a function on the Match contract to register the player
-        // Match(matches[targetIndex].matchAddress).addPlayer(msg.sender);
-
-        emit PlayerAssigned(msg.sender, matches[targetIndex].matchAddress);
     }
 
-    // This function is called by the Match contract when a game ends
-    function notifyMatchEnded(address player1, address player2) external {
-        require(
-            isAuthorizedMatch[msg.sender],
-            "Only authorized matches can call this"
-        );
+    // Assigns a player to the best available Match contract.
+    // The 1 ETH entry fee is deposited into the selected Match escrow.
+    function assignPlayer() external payable {
+        require(matches.length > 0, "Matches not initialized");
+        require(!activePlayer[msg.sender], "Player already active");
+        require(msg.value == ENTRY_FEE, "Incorrect entry fee");
 
-        // 1. Reset the player count for this match in our records
-        for (uint i = 0; i < matches.length; i++) {
+        uint256 targetIndex = _findAvailableMatch();
+
+        require(matches[targetIndex].currentPlayers < 2, "No available match");
+
+        address matchAddress = matches[targetIndex].matchAddress;
+
+        matches[targetIndex].currentPlayers++;
+        activePlayer[msg.sender] = true;
+
+        Match(matchAddress).addToQueue(msg.sender);
+        Match(matchAddress).depositEntryFee{value: msg.value}(msg.sender);
+
+        emit PlayerAssigned(msg.sender, matchAddress);
+
+        if (matches[targetIndex].currentPlayers == 2) {
+            Match(matchAddress).CreateMatch();
+        }
+    }
+
+    // Called only by an authorised Match contract when the game ends.
+    function notifyMatchEnded(address player1, address player2) external {
+        require(isAuthorizedMatch[msg.sender], "Only authorized matches can call this");
+
+        for (uint256 i = 0; i < matches.length; i++) {
             if (matches[i].matchAddress == msg.sender) {
                 matches[i].currentPlayers = 0;
                 break;
             }
         }
 
-        // Player must then re-join the game which will call the assignPlayer function.
+        activePlayer[player1] = false;
+        activePlayer[player2] = false;
+
         emit PlayersReturned(player1, player2);
+    }
+
+    // Finds a Match contract with one waiting player first.
+    // If none exist, it selects the least-filled available match.
+    function _findAvailableMatch() internal view returns (uint256) {
+        uint256 targetIndex = 0;
+        uint256 minPlayers = matches[0].currentPlayers;
+
+        for (uint256 i = 0; i < matches.length; i++) {
+            if (matches[i].currentPlayers == 1) {
+                return i;
+            }
+
+            if (matches[i].currentPlayers < minPlayers) {
+                minPlayers = matches[i].currentPlayers;
+                targetIndex = i;
+            }
+        }
+
+        return targetIndex;
+    }
+
+    // Helper function for Remix testing.
+    function getMatchCount() external view returns (uint256) {
+        return matches.length;
+    }
+
+    // Helper function for Remix testing.
+    function getMatchAddress(uint256 index) external view returns (address) {
+        require(index < matches.length, "Invalid match index");
+        return matches[index].matchAddress;
     }
 }
