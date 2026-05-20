@@ -1,37 +1,32 @@
-# Node modules
-/node_modules
+# Dependencies
+node_modules
+**/node_modules
 
-# Compilation output
-/dist
+# Hardhat and build outputs
+artifacts
+**/artifacts
+cache
+**/cache
+types
+**/types
+typechain-types
+**/typechain-types
+coverage
+**/coverage
+dist
+**/dist
+bundle
+**/bundle
 
-# pnpm deploy output
-/bundle
-
-# Hardhat Build Artifacts
-/artifacts
-
-# Hardhat compilation (v2) support directory
-/cache
-
-# Typechain output
-/types
+# Foundry/other local dependency cache
+.deps
+**/.deps
 
 # Environment files
 .env
 .env.*
 !.env.example
 
-# Hardhat coverage reports
-/coverage
-
-# Gas snapshot files
-/.gas-snapshot
-
-# Snapshot cheatcodes output
-/snapshots
-
-# Typechain output
-/types
-/typechain-types
-
-);
+# Misc local outputs
+.gas-snapshot
+snapshots

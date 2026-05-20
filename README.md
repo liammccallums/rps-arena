@@ -1,6 +1,11 @@
 # RPS Arena
 ### A Blockchain‑Powered Rock‑Paper‑Scissors Trading Card Game
 
+## Project Structure
+
+- blockchain/: Solidity smart contracts, Hardhat config, scripts, and test suite.
+- frontend/: Placeholder for the future React frontend application.
+
 RPS Arena is a competitive, turn‑based Rock‑Paper‑Scissors game built on blockchain technology.  
 Players use ERC‑1155 cards and power‑ups, commit to hidden moves, reveal them later, and battle in best‑of‑3 matches.  
 All items are real on‑chain assets that players fully own and can trade.
