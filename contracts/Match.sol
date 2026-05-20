@@ -286,4 +286,13 @@ contract Match {
 
         emit MovesReset();
     }
+
+    // Helper function for testing
+    function generateCommitment(
+        Move _move,
+        bytes32 _secret,
+        address _player
+    ) external pure returns (bytes32) {
+        return keccak256(abi.encodePacked(_move, _secret, _player));
+    }
 }
