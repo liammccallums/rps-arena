@@ -37,6 +37,8 @@ contract Match {
         address addr;
         uint256 score;
         Move move;
+        bytes32 commitment;
+        bool revealed;
     }
 
     GameStatus public status;
@@ -51,6 +53,7 @@ contract Match {
     event EscrowDeposited(address player, uint256 amount, uint256 escrowBalance);
     event MatchStarted(address player1, address player2);
     event MoveCommitted(address player);
+    event MoveRevealed(address player, Move move);
     event RoundDraw(address player1, address player2);
     event RoundWon(address winner, uint256 player1Score, uint256 player2Score);
     event MatchResolved(address winner, uint256 rewardAmount);
@@ -124,8 +127,8 @@ contract Match {
 
         status = GameStatus.Started;
 
-        player1 = Player(queue[0], 0, Move.None);
-        player2 = Player(queue[1], 0, Move.None);
+        player1 = Player(queue[0], 0, Move.None, bytes32(0), false);
+        player2 = Player(queue[1], 0, Move.None, bytes32(0), false);
 
         delete queue;
 
@@ -142,22 +145,54 @@ contract Match {
 
     // Players submit moves directly to the Match contract.
     // Once both players have submitted, the round is judged automatically.
-    function CommitMove(Move _move) external onlyPlayers {
+    function CommitMove(bytes32 _commitment) external onlyPlayers {
         require(status == GameStatus.WaitingForMoves, "Not waiting for moves");
         require(WaitForMove(), "Move timeout expired");
-        require(_move != Move.None, "Invalid move");
+        require(_commitment != bytes32(0), "Invalid commitment");
 
         if (msg.sender == player1.addr) {
-            require(player1.move == Move.None, "Already moved");
-            player1.move = _move;
+            require(player1.commitment == bytes32(0), "Already committed");
+            player1.commitment = _commitment;
         } else {
-            require(player2.move == Move.None, "Already moved");
-            player2.move = _move;
+            require(player2.commitment == bytes32(0), "Already committed");
+            player2.commitment = _commitment;
         }
 
         emit MoveCommitted(msg.sender);
 
-        if (player1.move != Move.None && player2.move != Move.None) {
+        if (player1.commitment != bytes32(0) && player2.commitment != bytes32(0)) {
+            roundStartTime = block.timestamp;
+        }
+    }
+
+    function RevealMove(Move _move, bytes32 _secret) external onlyPlayers{
+        require(status == GameStatus.WaitingForMoves, "Not waiting for reveal");
+        require(WaitForMove(), "Reveal timeout expired");
+        require(_move != Move.None, "Invalid move");
+
+        bytes32 calculatedCommitment = keccak256(
+            abi.encodePacked(_move, _secret, msg.sender)
+        );
+
+        if (msg.sender == player1.addr){
+            require(player1.commitment != bytes32(0), "No commitment found");
+            require(!player1.revealed, "Alreay revealed ");
+            require(player1.commitment == calculatedCommitment, "Invalid reveal");
+
+            player1.move = _move;
+            player1.revealed = true;
+        }else {
+            require(player2.commitment != bytes32(0), "No commitment found");
+            require(!player2.revealed, "Already revealed ");
+            require(player2.commitment == calculatedCommitment, "Invalid reveal");
+
+            player2.move = _move;
+            player2.revealed = true;
+        }
+
+        emit MoveRevealed(msg.sender, _move);
+
+        if (player1.revealed && player2.revealed){
             _judgeMoves();
         }
     }
@@ -166,8 +201,8 @@ contract Match {
     function _judgeMoves() internal {
         require(status == GameStatus.WaitingForMoves, "Not ready to judge");
         require(
-            player1.move != Move.None && player2.move != Move.None,
-            "Both players must submit moves"
+            player1.revealed && player2.revealed,
+            "Both players must reveal moves"
         );
 
         status = GameStatus.JudgingMoves;
@@ -239,6 +274,12 @@ contract Match {
     function _resetMoves() internal {
         player1.move = Move.None;
         player2.move = Move.None;
+
+        player1.commitment = bytes32(0);
+        player2.commitment = bytes32(0);
+
+        player1.revealed = false;
+        player2.revealed = false;
 
         roundStartTime = block.timestamp;
         status = GameStatus.WaitingForMoves;
