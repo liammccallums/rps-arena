@@ -17,11 +17,11 @@ describe("Manager and Match", function () {
 
   async function assignTwoPlayers(manager: any, ethers: any, player1: any, player2: any) {
     await manager.connect(player1).assignPlayer({
-      value: ethers.parseEther("1"),
+      value: ethers.parseEther("0.001"),
     });
 
     await manager.connect(player2).assignPlayer({
-      value: ethers.parseEther("1"),
+      value: ethers.parseEther("0.001"),
     });
   }
 
@@ -90,12 +90,12 @@ describe("Manager and Match", function () {
       const { ethers, manager, player1 } = await deployFixture();
 
       await manager.connect(player1).assignPlayer({
-        value: ethers.parseEther("1"),
+        value: ethers.parseEther("0.001"),
       });
 
       await expect(
         manager.connect(player1).assignPlayer({
-          value: ethers.parseEther("1"),
+          value: ethers.parseEther("0.001"),
         })
       ).to.be.revertedWith("Player already active");
     });

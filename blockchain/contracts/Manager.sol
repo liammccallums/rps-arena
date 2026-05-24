@@ -6,7 +6,7 @@ import "./Match.sol";
 contract Manager {
     address public immutable admin;
 
-    uint256 public constant ENTRY_FEE = 1 ether;
+    uint256 public constant ENTRY_FEE = 0.001 ether;
     uint256 public constant MATCH_POOL_SIZE = 3;
 
     struct MatchInfo {
@@ -32,7 +32,7 @@ contract Manager {
         _initializeMatches();
     }
 
-    // Deploys a fixed pool of Match contracts with a 1 ETH entry fee.
+    // Deploys a fixed pool of Match contracts with a 0.001 ETH entry fee.
     function _initializeMatches() internal {
         require(matches.length == 0, "Already initialized");
 
@@ -55,7 +55,7 @@ contract Manager {
     }
 
     // Assigns a player to the best available Match contract.
-    // The 1 ETH entry fee is deposited into the selected Match escrow.
+    // The 0.001 ETH entry fee is deposited into the selected Match escrow.
     function assignPlayer() external payable {
         require(matches.length > 0, "Matches not initialized");
         require(!activePlayer[msg.sender], "Player already active");
