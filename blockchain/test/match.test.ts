@@ -256,4 +256,29 @@ describe("Manager and Match", function () {
       ).to.be.revertedWith("Already committed");
     });
   });
+
+  describe("Timeout handling", function () {
+    it("awards the round to the only player who committed after timeout", async function () {
+      const { ethers, manager, match, player1, player2 } = await deployFixture();
+
+      await assignTwoPlayers(manager, ethers, player1, player2);
+
+      const secret = ethers.encodeBytes32String("p1-timeout");
+      const commitment = await match.generateCommitment(1, secret, player1.address);
+
+      await match.connect(player1).CommitMove(commitment);
+
+      await ethers.provider.send("evm_increaseTime", [301]);
+      await ethers.provider.send("evm_mine", []);
+
+      await match.connect(player1).ResolveTimeout();
+
+      const playerOne = await match.player1();
+      const playerTwo = await match.player2();
+
+      expect(playerOne.score).to.equal(1);
+      expect(playerTwo.score).to.equal(0);
+      expect(await match.status()).to.equal(3);
+    });
+  });
 });

@@ -43,7 +43,7 @@ export default function RevealResult({ matchAddress, roundData, onRevealSuccess 
       setMessage('Signing reveal transaction in MetaMask...');
 
       // Execute the call on Match.sol
-      const tx = await revealMove(matchAddress, savedMove, savedSecret);
+      await revealMove(matchAddress, savedMove, savedSecret);
       setMessage('Transaction sent! Waiting for validation...');
       
       setHasRevealed(true);

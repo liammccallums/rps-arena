@@ -1,7 +1,6 @@
-import { BrowserProvider, Contract, ContractTransactionResponse, parseEther, keccak256, toUtf8Bytes, solidityPackedKeccak256 } from "ethers";
+import { BrowserProvider, Contract, ContractTransactionResponse, parseEther, solidityPackedKeccak256 } from "ethers";
 
-// 1. Replace with your deployed Manager contract address
-const MANAGER_ADDRESS: string = "0xYOUR_DEPLOYED_MANAGER_ADDRESS_HERE";
+const MANAGER_ADDRESS = import.meta.env.VITE_MANAGER_ADDRESS;
 
 // 2. ABIs generated directly from your Solidity source code
 export const MANAGER_ABI = [
@@ -86,7 +85,7 @@ export const MANAGER_ABI = [
   {
     inputs: [
       { internalType: "address", name: "player1", type: "address" },
-      { indexed: false, internalType: "address", name: "player2", type: "address" }
+      { internalType: "address", name: "player2", type: "address" }
     ],
     name: "notifyMatchEnded",
     outputs: [],
@@ -226,6 +225,46 @@ export const MATCH_ABI = [
     outputs: [],
     stateMutability: "payable",
     type: "function"
+  },
+  {
+    inputs: [],
+    name: "player1",
+    outputs: [
+      { internalType: "address", name: "addr", type: "address" },
+      { internalType: "uint256", name: "score", type: "uint256" },
+      { internalType: "uint8", name: "move", type: "uint8" },
+      { internalType: "bytes32", name: "commitment", type: "bytes32" },
+      { internalType: "bool", name: "revealed", type: "bool" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "player2",
+    outputs: [
+      { internalType: "address", name: "addr", type: "address" },
+      { internalType: "uint256", name: "score", type: "uint256" },
+      { internalType: "uint8", name: "move", type: "uint8" },
+      { internalType: "bytes32", name: "commitment", type: "bytes32" },
+      { internalType: "bool", name: "revealed", type: "bool" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "status",
+    outputs: [{ internalType: "uint8", name: "", type: "uint8" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "ResolveTimeout",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
   }
 ] as const;
 
@@ -243,6 +282,9 @@ async function getSigner() {
  * Instantiates the main entry point contract.
  */
 export async function getManagerContract(): Promise<Contract> {
+  if (!MANAGER_ADDRESS) {
+    throw new Error("Missing VITE_MANAGER_ADDRESS in frontend env configuration");
+  }
   const signer = await getSigner();
   return new Contract(MANAGER_ADDRESS, MANAGER_ABI, signer);
 }
@@ -260,11 +302,11 @@ export async function getMatchContract(matchAddress: string): Promise<Contract> 
 // ==========================================
 
 /**
- * Joins matchmaking pool by executing assignPlayer and sending the required 1 ETH entry fee.
+ * Joins matchmaking pool by executing assignPlayer and sending the required 0.001 ETH entry fee.
  */
 export async function assignPlayer(): Promise<ContractTransactionResponse> {
   const contract = await getManagerContract();
-  const tx = await contract.assignPlayer({ value: parseEther("1.0") });
+  const tx = await contract.assignPlayer({ value: parseEther("0.001") });
   return tx as ContractTransactionResponse;
 }
 
@@ -307,10 +349,10 @@ export async function revealMove(matchAddress: string, move: number, secret: str
  * Generates a keccak256 hash of the player's chosen move and a secret string.
  * This hash is used for committing a move in the game.
  * @param move The player's chosen move (e.g., 1 for Rock, 2 for Paper, 3 for Scissors).
- * @param secret A unique secret string chosen by the player.
+ * @param secret A bytes32 random salt.
+ * @param playerAddress The player's wallet address.
  * @returns The keccak256 hash as a bytes32 string.
  */
-export function generateCommitment(move: number, secret: string): string {
-  const hashedSecret = keccak256(toUtf8Bytes(secret));
-  return solidityPackedKeccak256(["uint8", "bytes32"], [move, hashedSecret]);
+export function generateCommitment(move: number, secret: string, playerAddress: string): string {
+  return solidityPackedKeccak256(["uint8", "bytes32", "address"], [move, secret, playerAddress]);
 }

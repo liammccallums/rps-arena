@@ -31,7 +31,6 @@ export default function App() {
   
   // Dynamic Web3 State
   const [playerAddress, setPlayerAddress] = useState<string>('');
-  const [opponentAddress, setOpponentAddress] = useState<string>('');
   const [matchAddress, setMatchAddress] = useState<string>('');
 
   // Game Engine State
@@ -52,7 +51,7 @@ export default function App() {
     async function initWallet() {
       if (typeof window !== 'undefined' && window.ethereum) {
         try {
-          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+          const accounts = await window.ethereum.request({ method: 'eth_accounts' }) as string[];
           if (accounts && accounts.length > 0) {
             setPlayerAddress(accounts[0].toLowerCase());
           }
@@ -101,10 +100,23 @@ export default function App() {
         if (matchAddress) {
           matchContract = await getMatchContract(matchAddress);
 
+          // If MatchStarted fired before we attached listeners, recover from state.
+          const status = Number(await matchContract.status());
+          if (status === 3) {
+            const p1Struct = await matchContract.player1();
+            const p2Struct = await matchContract.player2();
+            const opp = p1Struct.addr.toLowerCase() === stateRef.current.playerAddress
+              ? p2Struct.addr.toLowerCase()
+              : p1Struct.addr.toLowerCase();
+
+            if (opp) {
+              setCurrentScreen('PICK');
+              setScreenMessage('');
+            }
+          }
+
           // 2. Both players found! Game starts
-          matchContract.on('MatchStarted', (p1: string, p2: string) => {
-            const opp = p1.toLowerCase() === stateRef.current.playerAddress ? p2.toLowerCase() : p1.toLowerCase();
-            setOpponentAddress(opp);
+          matchContract.on('MatchStarted', (_p1: string, _p2: string) => {
             setCurrentScreen('PICK');
             setScreenMessage('');
           });
@@ -171,7 +183,6 @@ export default function App() {
       
       // Pull player identities from contract state to correlate scores accurately
       const p1Struct = await activeRoom.player1();
-      const p2Struct = await activeRoom.player2();
       
       const isPlayerP1 = p1Struct.addr.toLowerCase() === stateRef.current.playerAddress;
       
@@ -219,7 +230,6 @@ export default function App() {
   const handleReset = (): void => {
     setScores({ player: 0, opponent: 0 });
     setMatchAddress('');
-    setOpponentAddress('');
     setLastRound(null);
     setCurrentScreen('JOIN');
     setScreenMessage('');
