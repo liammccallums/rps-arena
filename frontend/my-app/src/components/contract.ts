@@ -278,6 +278,37 @@ async function getSigner() {
   return await provider.getSigner();
 }
 
+async function assertSignerIsMatchPlayer(matchAddress: string): Promise<Contract> {
+  const signer = await getSigner();
+  const signerAddress = (await signer.getAddress()).toLowerCase();
+  const contract = new Contract(matchAddress, MATCH_ABI, signer);
+
+  const [p1Struct, p2Struct] = await Promise.all([
+    contract.player1(),
+    contract.player2()
+  ]);
+
+  const p1 = String(p1Struct.addr).toLowerCase();
+  const p2 = String(p2Struct.addr).toLowerCase();
+
+  if (
+    p1 === "0x0000000000000000000000000000000000000000" &&
+    p2 === "0x0000000000000000000000000000000000000000"
+  ) {
+    throw new Error(
+      "This match is no longer active (player slots were reset). It likely already resolved on-chain. Refresh both tabs and rejoin matchmaking."
+    );
+  }
+
+  if (signerAddress !== p1 && signerAddress !== p2) {
+    throw new Error(
+      `Connected wallet ${signerAddress} is not a player in this match. Expected ${p1} or ${p2}. Switch MetaMask account for this browser profile and try again.`
+    );
+  }
+
+  return contract;
+}
+
 /**
  * Instantiates the main entry point contract.
  */
@@ -306,7 +337,7 @@ export async function getMatchContract(matchAddress: string): Promise<Contract> 
  */
 export async function assignPlayer(): Promise<ContractTransactionResponse> {
   const contract = await getManagerContract();
-  const tx = await contract.assignPlayer({ value: parseEther("0.001") });
+  const tx = await contract.assignPlayer({ value: parseEther("0.001"), gasLimit: 500000 });
   return tx as ContractTransactionResponse;
 }
 
@@ -328,7 +359,7 @@ export async function isActivePlayer(playerAddress: string): Promise<boolean> {
  * @param commitment The keccak256 hash output string
  */
 export async function commitMove(matchAddress: string, commitment: string): Promise<void> {
-  const contract = await getMatchContract(matchAddress);
+  const contract = await assertSignerIsMatchPlayer(matchAddress);
   const tx: ContractTransactionResponse = await contract.CommitMove(commitment);
   await tx.wait();
 }
@@ -340,7 +371,7 @@ export async function commitMove(matchAddress: string, commitment: string): Prom
  * @param secret Unique salt string used when structuring the initial commitment
  */
 export async function revealMove(matchAddress: string, move: number, secret: string): Promise<void> {
-  const contract = await getMatchContract(matchAddress);
+  const contract = await assertSignerIsMatchPlayer(matchAddress);
   const tx: ContractTransactionResponse = await contract.RevealMove(move, secret);
   await tx.wait();
 }

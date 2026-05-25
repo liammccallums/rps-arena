@@ -23,6 +23,7 @@ export default function RevealResult({ matchAddress, roundData, onRevealSuccess 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [hasRevealed, setHasRevealed] = useState(false);
+  const isRoundFinished = hasRevealed && roundData.opponentMove !== 0;
 
   const resultColor = roundData.result === 'WIN' ? 'green.400' : roundData.result === 'LOSS' ? 'red.400' : 'gray.400';
 
@@ -47,11 +48,7 @@ export default function RevealResult({ matchAddress, roundData, onRevealSuccess 
       setMessage('Transaction sent! Waiting for validation...');
       
       setHasRevealed(true);
-      setMessage('Move validated on-chain!');
-      
-      if (onRevealSuccess) {
-        onRevealSuccess();
-      }
+      setMessage('Move validated on-chain! Waiting for opponent reveal and round result...');
     } catch (error: any) {
       console.error("Failed to reveal move:", error);
       setMessage(`Error: ${error.reason || error.message || error.toString()}`);
@@ -79,6 +76,12 @@ export default function RevealResult({ matchAddress, roundData, onRevealSuccess 
             Reveal My Choice ({MOVE_MAP[roundData.playerMove] || 'Unknown'})
           </Button>
         </Box>
+      ) : !isRoundFinished ? (
+        <Box my={6}>
+          <Text color="gray.300">
+            Reveal submitted. Waiting for opponent reveal and round result...
+          </Text>
+        </Box>
       ) : (
         <>
           <Flex align="center" justify="space-around" my={8} gap={10}>
@@ -102,6 +105,12 @@ export default function RevealResult({ matchAddress, roundData, onRevealSuccess 
           <Heading as="h2" size="xl" color={resultColor} mt={4}>
             {roundData.result === 'DRAW' ? 'You Tied!' : `You ${roundData.result}!`}
           </Heading>
+
+          {onRevealSuccess && (
+            <Button mt={6} colorScheme="blue" onClick={onRevealSuccess} w="full">
+              Continue
+            </Button>
+          )}
         </>
       )}
 

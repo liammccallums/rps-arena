@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Box, Flex, Heading, Text, Spinner } from '@chakra-ui/react';
 import { getManagerContract, getMatchContract } from './components/contract';
-import { Contract } from 'ethers';
+import { Contract, ZeroHash } from 'ethers';
 
 // Sub-components
 import JoinQueue from './components/JoinQueue';
@@ -32,6 +32,7 @@ export default function App() {
   // Dynamic Web3 State
   const [playerAddress, setPlayerAddress] = useState<string>('');
   const [matchAddress, setMatchAddress] = useState<string>('');
+  const [isPlayer1, setIsPlayer1] = useState<boolean | null>(null);
 
   // Game Engine State
   const [scores, setScores] = useState<Scores>({ player: 0, opponent: 0 });
@@ -39,10 +40,10 @@ export default function App() {
   const [finalResult, setFinalResult] = useState<'WIN' | 'LOSS'>('LOSS');
 
   // Using refs to prevent stale closures inside global event callback loops
-  const stateRef = useRef({ playerAddress, matchAddress });
+  const stateRef = useRef({ playerAddress, matchAddress, isPlayer1 });
   useEffect(() => {
-    stateRef.current = { playerAddress, matchAddress };
-  }, [playerAddress, matchAddress]);
+    stateRef.current = { playerAddress, matchAddress, isPlayer1 };
+  }, [playerAddress, matchAddress, isPlayer1]);
 
   // ==========================================
   // WEB3 & INITIAL SETUP
@@ -91,6 +92,7 @@ export default function App() {
         managerContract.on('PlayerAssigned', (assignedPlayer: string, roomAddress: string) => {
           if (assignedPlayer.toLowerCase() === stateRef.current.playerAddress) {
             setMatchAddress(roomAddress.toLowerCase());
+            setIsPlayer1(null);
             setCurrentScreen('WAITING_FOR_MATCH');
             setScreenMessage('Assigned to game lobby! Waiting for a challenger...');
           }
@@ -105,6 +107,8 @@ export default function App() {
           if (status === 3) {
             const p1Struct = await matchContract.player1();
             const p2Struct = await matchContract.player2();
+            const localIsPlayer1 = p1Struct.addr.toLowerCase() === stateRef.current.playerAddress;
+            setIsPlayer1(localIsPlayer1);
             const opp = p1Struct.addr.toLowerCase() === stateRef.current.playerAddress
               ? p2Struct.addr.toLowerCase()
               : p1Struct.addr.toLowerCase();
@@ -117,16 +121,46 @@ export default function App() {
 
           // 2. Both players found! Game starts
           matchContract.on('MatchStarted', (_p1: string, _p2: string) => {
+            setIsPlayer1(_p1.toLowerCase() === stateRef.current.playerAddress);
             setCurrentScreen('PICK');
             setScreenMessage('');
           });
 
           // 3. Move Committed
-          matchContract.on('MoveCommitted', (committer: string) => {
+          matchContract.on('MoveCommitted', async (committer: string) => {
             // If the sender was us, push screen to wait for the other side
             if (committer.toLowerCase() === stateRef.current.playerAddress) {
               setCurrentScreen('WAITING_FOR_REVEAL');
               setScreenMessage('Move recorded on-chain! Waiting for opponent to commit...');
+            }
+
+            try {
+              if (!matchContract) {
+                return;
+              }
+
+              const p1Struct = await matchContract.player1();
+              const p2Struct = await matchContract.player2();
+
+              const bothCommitted =
+                p1Struct.commitment !== ZeroHash &&
+                p2Struct.commitment !== ZeroHash;
+
+              if (bothCommitted) {
+                const localSavedMove = localStorage.getItem(`match_${stateRef.current.matchAddress}_move`);
+                const playedMove = localSavedMove ? parseInt(localSavedMove, 10) : 0;
+
+                // opponentMove=0 means "waiting for round result" in RevealResult.
+                setLastRound({
+                  playerMove: playedMove,
+                  opponentMove: 0,
+                  result: 'DRAW'
+                });
+                setCurrentScreen('REVEAL_PHASE');
+                setScreenMessage('');
+              }
+            } catch (err) {
+              console.error('Failed to check commitment status:', err);
             }
           });
 
@@ -179,12 +213,16 @@ export default function App() {
   // ==========================================
   const handleRoundResolution = async (winnerAddress: string, p1Score: bigint, p2Score: bigint) => {
     try {
-      const activeRoom = await getMatchContract(stateRef.current.matchAddress);
-      
-      // Pull player identities from contract state to correlate scores accurately
-      const p1Struct = await activeRoom.player1();
-      
-      const isPlayerP1 = p1Struct.addr.toLowerCase() === stateRef.current.playerAddress;
+      let isPlayerP1 = stateRef.current.isPlayer1;
+      if (isPlayerP1 === null) {
+        const activeRoom = await getMatchContract(stateRef.current.matchAddress);
+        const p1Struct = await activeRoom.player1();
+        if (p1Struct.addr === '0x0000000000000000000000000000000000000000') {
+          throw new Error('Match state was reset before score parsing.');
+        }
+        isPlayerP1 = p1Struct.addr.toLowerCase() === stateRef.current.playerAddress;
+        setIsPlayer1(isPlayerP1);
+      }
       
       const playerCurrentScore = Number(isPlayerP1 ? p1Score : p2Score);
       const opponentCurrentScore = Number(isPlayerP1 ? p2Score : p1Score);
@@ -230,6 +268,7 @@ export default function App() {
   const handleReset = (): void => {
     setScores({ player: 0, opponent: 0 });
     setMatchAddress('');
+    setIsPlayer1(null);
     setLastRound(null);
     setCurrentScreen('JOIN');
     setScreenMessage('');
