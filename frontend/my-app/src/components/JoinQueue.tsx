@@ -41,7 +41,7 @@ export default function JoinQueue() {
         loadingText="Processing..."
         w="full"
       >
-        Join Matchmaking Queue (1 ETH)
+        Join Matchmaking Queue (0.001 ETH)
       </Button>
       
       {message && (

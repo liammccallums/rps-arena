@@ -1,7 +1,7 @@
 import { BrowserProvider, Contract, ContractTransactionResponse, parseEther, keccak256, toUtf8Bytes, solidityPackedKeccak256 } from "ethers";
 
 // 1. Replace with your deployed Manager contract address
-const MANAGER_ADDRESS: string = "0xYOUR_DEPLOYED_MANAGER_ADDRESS_HERE";
+const MANAGER_ADDRESS: string = "0xD62E189b4eE46A60ECda2358Da28a438776238F2";
 
 // 2. ABIs generated directly from your Solidity source code
 export const MANAGER_ABI = [
@@ -264,7 +264,11 @@ export async function getMatchContract(matchAddress: string): Promise<Contract> 
  */
 export async function assignPlayer(): Promise<ContractTransactionResponse> {
   const contract = await getManagerContract();
-  const tx = await contract.assignPlayer({ value: parseEther("1.0") });
+  // Giving it 500,000 gas ensures all 3 nested cross-contract calls can complete safely
+  const tx = await contract.assignPlayer({ 
+    value: parseEther("0.001"),
+    gasLimit: 500000 
+  });
   return tx as ContractTransactionResponse;
 }
 
