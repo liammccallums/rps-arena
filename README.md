@@ -30,6 +30,29 @@ Stop everything with one command:
 
 Open the app at `http://127.0.0.1:5173`.
 
+### Add Hardhat Localhost to MetaMask
+
+Before playing, connect MetaMask to the local Hardhat chain.
+
+In MetaMask:
+1) Open the network selector -> `Add network` -> `Add a network manually`.
+2) Enter:
+  - Network Name: `Hardhat Local`
+  - New RPC URL: `http://127.0.0.1:8545`
+  - Chain ID: `31337`
+  - Currency Symbol: `ETH`
+3) Save, then switch MetaMask to `Hardhat Local`.
+
+### Import a Hardhat Test Wallet into MetaMask
+
+When `npx hardhat node` starts, it prints funded test accounts and private keys.
+
+To import one account:
+1) Copy one private key from the `Private Keys` section in the Hardhat terminal.
+2) In MetaMask, click account menu -> `Add account or hardware wallet` -> `Import account`.
+3) Paste the private key and confirm.
+4) Keep MetaMask on the `Hardhat Local` network.
+
 ### Manual Setup (Optional)
 
 Use this only if you want to run each component yourself.
