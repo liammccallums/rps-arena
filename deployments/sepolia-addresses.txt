@@ -5,3 +5,18 @@ MATCH_COUNT=3
 MATCH_0_ADDRESS=0xafe5aDA68dc3bD587Cc57D73f1C3864098F6b2c8
 MATCH_1_ADDRESS=0xfB6adfE1a348D60e346478F84C38d8E5F2e551b0
 MATCH_2_ADDRESS=0x45B978bFC7C804Eb28aFC1b461b0D6e58bA91502
+
+Live Frontend
+-------------
+Vercel URL: https://rps-arena-gules.vercel.app
+
+Successful Live Match Evidence
+------------------------------
+Final Reveal / Payout Transaction:
+0x81516a1258c6b269e3e506261dd9eb77f51269b5a039604223bd94f259996eda
+
+Match Contract Used:
+0xafe5aDA68dc3bD587Cc57D73f1C3864098F6b2c8
+
+Result:
+Player 1 won and received the combined 0.002 Sepolia ETH escrow payout.
