@@ -1,6 +1,8 @@
 import { BrowserProvider, Contract, ContractTransactionResponse, parseEther, solidityPackedKeccak256 } from "ethers";
 
 const MANAGER_ADDRESS = import.meta.env.VITE_MANAGER_ADDRESS;
+const REQUIRED_CHAIN_ID = 11155111n;
+const REQUIRED_NETWORK_NAME = "Sepolia";
 
 // 2. ABIs generated directly from your Solidity source code
 export const MANAGER_ABI = [
@@ -273,8 +275,18 @@ async function getSigner() {
   if (typeof window === "undefined" || !window.ethereum) {
     throw new Error("MetaMask not found");
   }
+
   const provider = new BrowserProvider(window.ethereum);
   await provider.send("eth_requestAccounts", []);
+
+  const network = await provider.getNetwork();
+
+  if (network.chainId !== REQUIRED_CHAIN_ID) {
+    throw new Error(
+      `Wrong network selected. Please switch MetaMask to ${REQUIRED_NETWORK_NAME} before playing.`
+    );
+  }
+
   return await provider.getSigner();
 }
 
