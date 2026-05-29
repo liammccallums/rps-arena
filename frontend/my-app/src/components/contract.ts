@@ -1,6 +1,7 @@
 import { BrowserProvider, Contract, ContractTransactionResponse, isAddress, parseEther, solidityPackedKeccak256 } from "ethers";
 
-const MANAGER_ADDRESS = import.meta.env.VITE_MANAGER_ADDRESS;
+const DEFAULT_MANAGER_ADDRESS = "0xaF6999cF9b9012e5de9413001A65D42488E2Eb0f";
+const MANAGER_ADDRESS = import.meta.env.VITE_MANAGER_ADDRESS ?? DEFAULT_MANAGER_ADDRESS;
 const SUPPORTED_NETWORKS = new Map<bigint, string>([
   [31337n, "Hardhat Local"],
   [452n, "QUT Testnet"],
