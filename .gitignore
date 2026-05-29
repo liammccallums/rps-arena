@@ -30,3 +30,4 @@ bundle
 # Misc local outputs
 .gas-snapshot
 snapshots
+.local-dev

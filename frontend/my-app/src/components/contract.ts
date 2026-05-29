@@ -1,7 +1,8 @@
-import { BrowserProvider, Contract, ContractTransactionResponse, parseEther, keccak256, toUtf8Bytes, solidityPackedKeccak256 } from "ethers";
+import { BrowserProvider, Contract, ContractTransactionResponse, parseEther, solidityPackedKeccak256 } from "ethers";
 
-// 1. Replace with your deployed Manager contract address
-const MANAGER_ADDRESS: string = "0xD62E189b4eE46A60ECda2358Da28a438776238F2";
+const MANAGER_ADDRESS = import.meta.env.VITE_MANAGER_ADDRESS;
+const REQUIRED_CHAIN_ID = 11155111n;
+const REQUIRED_NETWORK_NAME = "Sepolia";
 
 // 2. ABIs generated directly from your Solidity source code
 export const MANAGER_ABI = [
@@ -86,7 +87,7 @@ export const MANAGER_ABI = [
   {
     inputs: [
       { internalType: "address", name: "player1", type: "address" },
-      { indexed: false, internalType: "address", name: "player2", type: "address" }
+      { internalType: "address", name: "player2", type: "address" }
     ],
     name: "notifyMatchEnded",
     outputs: [],
@@ -226,6 +227,46 @@ export const MATCH_ABI = [
     outputs: [],
     stateMutability: "payable",
     type: "function"
+  },
+  {
+    inputs: [],
+    name: "player1",
+    outputs: [
+      { internalType: "address", name: "addr", type: "address" },
+      { internalType: "uint256", name: "score", type: "uint256" },
+      { internalType: "uint8", name: "move", type: "uint8" },
+      { internalType: "bytes32", name: "commitment", type: "bytes32" },
+      { internalType: "bool", name: "revealed", type: "bool" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "player2",
+    outputs: [
+      { internalType: "address", name: "addr", type: "address" },
+      { internalType: "uint256", name: "score", type: "uint256" },
+      { internalType: "uint8", name: "move", type: "uint8" },
+      { internalType: "bytes32", name: "commitment", type: "bytes32" },
+      { internalType: "bool", name: "revealed", type: "bool" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "status",
+    outputs: [{ internalType: "uint8", name: "", type: "uint8" }],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "ResolveTimeout",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function"
   }
 ] as const;
 
@@ -234,15 +275,59 @@ async function getSigner() {
   if (typeof window === "undefined" || !window.ethereum) {
     throw new Error("MetaMask not found");
   }
+
   const provider = new BrowserProvider(window.ethereum);
   await provider.send("eth_requestAccounts", []);
+
+  const network = await provider.getNetwork();
+
+  if (network.chainId !== REQUIRED_CHAIN_ID) {
+    throw new Error(
+      `Wrong network selected. Please switch MetaMask to ${REQUIRED_NETWORK_NAME} before playing.`
+    );
+  }
+
   return await provider.getSigner();
+}
+
+async function assertSignerIsMatchPlayer(matchAddress: string): Promise<Contract> {
+  const signer = await getSigner();
+  const signerAddress = (await signer.getAddress()).toLowerCase();
+  const contract = new Contract(matchAddress, MATCH_ABI, signer);
+
+  const [p1Struct, p2Struct] = await Promise.all([
+    contract.player1(),
+    contract.player2()
+  ]);
+
+  const p1 = String(p1Struct.addr).toLowerCase();
+  const p2 = String(p2Struct.addr).toLowerCase();
+
+  if (
+    p1 === "0x0000000000000000000000000000000000000000" &&
+    p2 === "0x0000000000000000000000000000000000000000"
+  ) {
+    throw new Error(
+      "This match is no longer active (player slots were reset). It likely already resolved on-chain. Refresh both tabs and rejoin matchmaking."
+    );
+  }
+
+  if (signerAddress !== p1 && signerAddress !== p2) {
+    throw new Error(
+      `Connected wallet ${signerAddress} is not a player in this match. Expected ${p1} or ${p2}. Switch MetaMask account for this browser profile and try again.`
+    );
+  }
+
+  return contract;
 }
 
 /**
  * Instantiates the main entry point contract.
  */
 export async function getManagerContract(): Promise<Contract> {
+  if (!MANAGER_ADDRESS) {
+    throw new Error("Missing VITE_MANAGER_ADDRESS in frontend env configuration");
+  }
   const signer = await getSigner();
   return new Contract(MANAGER_ADDRESS, MANAGER_ABI, signer);
 }
@@ -260,15 +345,11 @@ export async function getMatchContract(matchAddress: string): Promise<Contract> 
 // ==========================================
 
 /**
- * Joins matchmaking pool by executing assignPlayer and sending the required 1 ETH entry fee.
+ * Joins matchmaking pool by executing assignPlayer and sending the required 0.001 ETH entry fee.
  */
 export async function assignPlayer(): Promise<ContractTransactionResponse> {
   const contract = await getManagerContract();
-  // Giving it 500,000 gas ensures all 3 nested cross-contract calls can complete safely
-  const tx = await contract.assignPlayer({ 
-    value: parseEther("0.001"),
-    gasLimit: 500000 
-  });
+  const tx = await contract.assignPlayer({ value: parseEther("0.001"), gasLimit: 500000 });
   return tx as ContractTransactionResponse;
 }
 
@@ -290,7 +371,7 @@ export async function isActivePlayer(playerAddress: string): Promise<boolean> {
  * @param commitment The keccak256 hash output string
  */
 export async function commitMove(matchAddress: string, commitment: string): Promise<void> {
-  const contract = await getMatchContract(matchAddress);
+  const contract = await assertSignerIsMatchPlayer(matchAddress);
   const tx: ContractTransactionResponse = await contract.CommitMove(commitment);
   await tx.wait();
 }
@@ -302,7 +383,7 @@ export async function commitMove(matchAddress: string, commitment: string): Prom
  * @param secret Unique salt string used when structuring the initial commitment
  */
 export async function revealMove(matchAddress: string, move: number, secret: string): Promise<void> {
-  const contract = await getMatchContract(matchAddress);
+  const contract = await assertSignerIsMatchPlayer(matchAddress);
   const tx: ContractTransactionResponse = await contract.RevealMove(move, secret);
   await tx.wait();
 }
@@ -311,10 +392,10 @@ export async function revealMove(matchAddress: string, move: number, secret: str
  * Generates a keccak256 hash of the player's chosen move and a secret string.
  * This hash is used for committing a move in the game.
  * @param move The player's chosen move (e.g., 1 for Rock, 2 for Paper, 3 for Scissors).
- * @param secret A unique secret string chosen by the player.
+ * @param secret A bytes32 random salt.
+ * @param playerAddress The player's wallet address.
  * @returns The keccak256 hash as a bytes32 string.
  */
-export function generateCommitment(move: number, secret: string): string {
-  const hashedSecret = keccak256(toUtf8Bytes(secret));
-  return solidityPackedKeccak256(["uint8", "bytes32"], [move, hashedSecret]);
+export function generateCommitment(move: number, secret: string, playerAddress: string): string {
+  return solidityPackedKeccak256(["uint8", "bytes32", "address"], [move, secret, playerAddress]);
 }

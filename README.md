@@ -1,159 +1,203 @@
 # RPS Arena
-### A Blockchain‑Powered Rock‑Paper‑Scissors Trading Card Game
+### A Blockchain-Powered Commit-Reveal Rock-Paper-Scissors dApp
 
 ## Project Structure
 
 - blockchain/: Solidity smart contracts, Hardhat config, scripts, and test suite.
-- frontend/: Placeholder for the future React frontend application.
+- frontend/: React + Vite frontend used to join matches and play rounds through MetaMask.
 
-RPS Arena is a competitive, turn‑based Rock‑Paper‑Scissors game built on blockchain technology.  
-Players use ERC‑1155 cards and power‑ups, commit to hidden moves, reveal them later, and battle in best‑of‑3 matches.  
-All items are real on‑chain assets that players fully own and can trade.
+## Local Test Environment (Quick Runbook)
 
----
+### Quick Start (Recommended)
 
-## 🃏 1. Card Types
+From the repository root, start everything with one command:
 
-### **Base Cards**
-- Rock  
-- Paper  
-- Scissors  
+```bash
+./scripts/dev-up.sh
+```
 
-Base cards are **ERC‑1155 tokens** that represent the player’s moves during a round.  
-They are **never burned**, always available, and every player receives a starter set.
+Stop everything with one command:
 
-### **Power‑Ups**
-Single‑use ERC‑1155 items that modify the outcome of a round.  
-Examples:
-- **Rock Booster** – Rock beats Paper once  
-- **Paper Shield** – Paper cannot lose this round  
-- **Nullify** – Cancels your opponent’s power‑up for the round  
+```bash
+./scripts/dev-down.sh
+```
 
-Power‑ups are:
-- Earned from match rewards  
-- Burned when used  
-- Fully tradeable  
+`dev-up.sh` will:
+- start a local Hardhat node
+- deploy `Manager` to localhost
+- write `frontend/my-app/.env.local` with `VITE_MANAGER_ADDRESS`
+- start the Vite frontend
 
----
+Open the app at `http://127.0.0.1:5173`.
 
-## ⭐ 2. Card Tiers
+### Add Hardhat Localhost to MetaMask
 
-Base cards come in increasing tiers of strength.
+Before playing, connect MetaMask to the local Hardhat chain.
 
-### **Tier 1 — Starter Tier**
-- Given to all players  
-- Baseline strength  
-- Never burned  
+In MetaMask:
+1) Open the network selector -> `Add network` -> `Add a network manually`.
+2) Enter:
+  - Network Name: `Hardhat Local`
+  - New RPC URL: `http://127.0.0.1:8545`
+  - Chain ID: `31337`
+  - Currency Symbol: `ETH`
+3) Save, then switch MetaMask to `Hardhat Local`.
 
-### **Tier 2 — Rare Tier**
-- Earned through match rewards  
-- **Stronger in same‑type matchups**  
-  - Example: Tier 2 Rock beats Tier 1 Rock  
-- Type advantage still applies  
-  - Paper still beats Rock, even if Rock is Tier 3
+### Import a Hardhat Test Wallet into MetaMask
 
-### **Tier 3 — Epic Tier (Optional Future Expansion)**
-- Highly rare  
-- Strongest version of each type  
+When `npx hardhat node` starts, it prints funded test accounts and private keys.
 
-### 📌 Tier Rules Summary
-- Tiers only matter **when both players pick the same type**.  
-- Tiers never override the core RPS triangle (Rock > Scissors > Paper > Rock).
+To import one account:
+1) Copy one private key from the `Private Keys` section in the Hardhat terminal.
+2) In MetaMask, click account menu -> `Add account or hardware wallet` -> `Import account`.
+3) Paste the private key and confirm.
+4) Keep MetaMask on the `Hardhat Local` network.
 
----
+### Manual Setup (Optional)
 
-## 🎒 3. Player Loadout
+Use this only if you want to run each component yourself.
 
-Before each match, a player selects:
-- **Three base cards** (usually Rock, Paper, Scissors, or higher‑tier versions)  
-- **One optional power‑up** (burned if used)
+1) Start blockchain (Terminal 1)
 
-Loadout choices add strategy:
-- Use your tiered card early or save it for Round 3?  
-- Bring a power‑up or go in clean?  
-- Predict your opponent’s tendencies?
+```bash
+cd blockchain
+npx hardhat node
+```
 
----
+2) Deploy manager (Terminal 2)
 
-## 🕹️ 4. Match Flow (Best‑of‑3)
+```bash
+cd blockchain
+npx hardhat run scripts/deploy-manager-local.ts --network localhost
+```
 
-Each match has up to **three rounds**.  
-First to **two wins** takes the match.
+3) Set frontend env (Terminal 2)
 
-### **Step 1 — Commit Phase**
-Both players secretly choose:
-- Move (Rock/Paper/Scissors)  
-- Card tier  
-- Whether they will use their power‑up  
+```bash
+cd frontend/my-app
+echo "VITE_MANAGER_ADDRESS=<PASTE_MANAGER_ADDRESS_HERE>" > .env.local
+```
 
-They submit a **hashed commitment** containing all choices + a random nonce.  
-This hides the move from the opponent.
+4) Start frontend (Terminal 3)
 
-### **Step 2 — Reveal Phase**
-Players reveal:
-- The move  
-- The selected card  
-- The nonce  
-
-The system verifies the reveal matches the earlier commitment.
-
-### **Step 3 — Resolution**
-The smart contract:
-- Applies standard RPS rules  
-- Compares tier strengths  
-- Applies any active power‑ups  
-- Determines the winner of the round  
-- Burns used power‑ups  
-- Updates match score  
-
-If a player reaches 2 wins, the match ends.
+```bash
+cd frontend/my-app
+npm install
+npm run dev -- --host 127.0.0.1 --port 5173
+```
 
 ---
 
-## 🏆 5. Rewards
+## Current Implementation
 
-Winning a match grants a chance to receive:
-- **New power‑ups** (common)  
-- **Higher‑tier base cards** (rare)  
+RPS Arena currently implements an on-chain, 1v1 commit-reveal Rock-Paper-Scissors game with escrowed entry fees.
 
-Rewards are minted directly to the player’s wallet as ERC‑1155 items.  
-They can be kept, traded, or used in future matches.
+What is live right now:
+- A Manager contract deploys and manages a fixed pool of 3 Match contracts.
+- Players join by calling `assignPlayer` with exactly `0.001 ETH`.
+- The manager routes players into available lobbies and auto-starts a match when 2 players are assigned.
+- Each match is best-of-3 (first to 2 round wins).
+- Round play uses commit-reveal:
+  - Commit: each player submits a hash of `(move, secret, playerAddress)`.
+  - Reveal: each player submits `(move, secret)`; contract verifies against the commitment.
+- Escrow payout:
+  - Both entry fees are held in match escrow.
+  - Winner receives the full escrow when reaching 2 round wins.
+- Timeout handling:
+  - 5-minute timeout window per move/reveal stage.
+  - Players can call `ResolveTimeout` to progress stalled rounds.
 
----
+## Smart Contracts (Implemented)
 
-## 🔄 6. Trading
+### Manager.sol
+- Initializes and owns a pool of Match contracts.
+- Enforces entry fee (`0.001 ETH`) and active player guard (prevents double-queueing).
+- Assigns players to matches and tracks active player status.
+- Receives match-end notifications and returns players to idle state.
 
-All items (cards and power‑ups) are ERC‑1155 tokens and can be traded using:
-- Wallet‑to‑wallet transfers  
-- A trustless on‑chain marketplace (optional module)  
+### Match.sol
+- Handles lobby state, player queue, and game status transitions.
+- Records commitments and validates reveals.
+- Resolves round outcomes and score progression.
+- Supports timeout-based round resolution.
+- Pays escrow to winner and notifies manager when a match ends.
 
-Trading uses the standard `safeTransferFrom` function.
+## Frontend Behavior (Implemented)
 
----
+The React/Vite frontend:
+- Connects with MetaMask.
+- Reads manager address from `frontend/my-app/.env.local` via `VITE_MANAGER_ADDRESS`.
+- Lets players:
+  - Join queue (`assignPlayer` with 0.001 ETH).
+  - Commit a move.
+  - Reveal a move.
+  - Resolve timeout when needed.
+- Uses safeguards to ensure the connected wallet is one of the two active match players before commit/reveal.
 
-## 🔧 7. Technology Overview
+## Gameplay Flow (Implemented)
 
-- **ERC‑1155 Items Contract:** 
-  Stores all cards and power‑ups; enables minting, burning, and transfers.
+1. Player A and Player B each join queue with 0.001 ETH.
+2. Manager assigns both players to the same Match contract.
+3. Match starts and waits for committed hashes from both players.
+4. Both players reveal move + secret.
+5. Contract judges the round, updates score, and resets for next round.
+6. First player to 2 wins receives escrow payout.
+7. Match resets to matchmaking state for future players.
 
-- **Matchmaker Contract:**  
-  Manages commit–reveal, match state, round resolution, and rewards.
+## Future Extensions (Not Yet Implemented)
 
-- **Optional Rules Module:**  
-  Pure functions handling RPS logic, tiers, and power‑ups.
+The ideas below are planned concepts and are not currently part of the deployed gameplay in this repository.
 
-- **Optional Rewards Module:**  
-  Handles drop tables and mints new items.
+### Tokenized Cards and Power-Ups
+- ERC-1155 base cards (Rock, Paper, Scissors) as inventory items.
+- Single-use ERC-1155 power-ups that can modify round outcomes.
+- Optional tiered card strength model for same-type matchups.
 
-- **Optional Marketplace:**  
-  Peer‑to‑peer trading of ERC‑1155 items.
+### Rewards and Progression
+- Match rewards (for example, power-up drops or higher-tier cards).
+- On-chain mint/burn mechanics tied to match outcomes.
 
----
+### Trading Layer
+- Wallet-to-wallet trading of cards/power-ups.
+- Optional marketplace module for peer-to-peer listings and settlement.
 
-## 📘 8. Summary
+### Extended Game Modules
+- Dedicated rules module for power-up/tier interactions.
+- Dedicated rewards/drop-table module for progression balancing.
 
-RPS Arena brings a strategic, collectible layer to classic Rock‑Paper‑Scissors.  
-Players build loadouts, use powerful consumables, earn rare cards, and battle in a fully decentralised, tamper‑proof environment.  
-All items are real blockchain assets, owned permanently and tradable by players.
+## Troubleshooting and Reset
+
+### Script command not found
+
+If `dev-up.sh` or `dev-down.sh` says command not found, run with a path from repo root:
+
+```bash
+./scripts/dev-up.sh
+./scripts/dev-down.sh
+```
+
+If needed, make scripts executable once:
+
+```bash
+chmod +x scripts/dev-up.sh scripts/dev-down.sh
+```
+
+### Full local reset
+
+```bash
+./scripts/dev-down.sh || true
+pkill -f "hardhat node" || true
+pkill -f "vite --host 127.0.0.1 --port 5173" || true
+./scripts/dev-up.sh
+```
+
+### "Player already active" when joining
+
+This means the address is still marked active in the current local chain state.
+
+Fix options:
+- Finish/resolve the current match for that player.
+- Use a different local account in MetaMask.
+- Run the full local reset above.
 
 ---

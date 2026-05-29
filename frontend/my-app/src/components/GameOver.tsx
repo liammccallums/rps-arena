@@ -26,7 +26,7 @@ export default function GameOver({ result, onReset }: GameOverProps) {
             {isWinner ? 'Escrow Reward Disbursed' : 'Entry Fee Deposited'}
           </StatLabel>
           <StatNumber color={isWinner ? 'green.300' : 'red.300'} fontSize="2xl">
-            {isWinner ? '+ 2.0 ETH' : '- 1.0 ETH'}
+            {isWinner ? '+ 0.002 ETH' : '- 0.001 ETH'}
           </StatNumber>
         </Stat>
         <Text fontSize="xs" color="gray.500" mt={2}>

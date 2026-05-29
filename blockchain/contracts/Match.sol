@@ -58,6 +58,7 @@ contract Match {
     event RoundWon(address winner, uint256 player1Score, uint256 player2Score);
     event MatchResolved(address winner, uint256 rewardAmount);
     event MovesReset();
+    event RoundTimedOut();
 
     constructor(address _managerAddress) {
         require(_managerAddress != address(0), "Invalid manager address");
@@ -176,14 +177,14 @@ contract Match {
 
         if (msg.sender == player1.addr){
             require(player1.commitment != bytes32(0), "No commitment found");
-            require(!player1.revealed, "Alreay revealed ");
+            require(!player1.revealed, "Already revealed");
             require(player1.commitment == calculatedCommitment, "Invalid reveal");
 
             player1.move = _move;
             player1.revealed = true;
         }else {
             require(player2.commitment != bytes32(0), "No commitment found");
-            require(!player2.revealed, "Already revealed ");
+            require(!player2.revealed, "Already revealed");
             require(player2.commitment == calculatedCommitment, "Invalid reveal");
 
             player2.move = _move;
@@ -195,6 +196,54 @@ contract Match {
         if (player1.revealed && player2.revealed){
             _judgeMoves();
         }
+    }
+
+    // Resolves a stalled round after the timeout window.
+    // If only one player progressed (commit/reveal), that player wins the round.
+    // If both players are equally inactive, the round is reset without score changes.
+    function ResolveTimeout() external onlyPlayers {
+        require(status == GameStatus.WaitingForMoves, "Not in active round");
+        require(block.timestamp > roundStartTime + MOVE_TIMEOUT, "Move timer still active");
+
+        bool p1Committed = player1.commitment != bytes32(0);
+        bool p2Committed = player2.commitment != bytes32(0);
+
+        if (!p1Committed && !p2Committed) {
+            emit RoundTimedOut();
+            _resetMoves();
+            return;
+        }
+
+        if (p1Committed && !p2Committed) {
+            player1.score++;
+            emit RoundWon(player1.addr, player1.score, player2.score);
+            _checkScore();
+            return;
+        }
+
+        if (!p1Committed && p2Committed) {
+            player2.score++;
+            emit RoundWon(player2.addr, player1.score, player2.score);
+            _checkScore();
+            return;
+        }
+
+        if (player1.revealed && !player2.revealed) {
+            player1.score++;
+            emit RoundWon(player1.addr, player1.score, player2.score);
+            _checkScore();
+            return;
+        }
+
+        if (!player1.revealed && player2.revealed) {
+            player2.score++;
+            emit RoundWon(player2.addr, player1.score, player2.score);
+            _checkScore();
+            return;
+        }
+
+        emit RoundTimedOut();
+        _resetMoves();
     }
 
     // Internal judging logic. This is triggered automatically by CommitMove().
