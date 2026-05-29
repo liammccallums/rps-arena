@@ -30,6 +30,8 @@ Stop everything with one command:
 
 Open the app at `http://127.0.0.1:5173`.
 
+`scripts/dev-up.sh` and `scripts/dev-down.sh` are for local Hardhat development only. They do not deploy to QUT testnet.
+
 ### Add Hardhat Localhost to MetaMask
 
 Before playing, connect MetaMask to the local Hardhat chain.
@@ -79,6 +81,59 @@ echo "VITE_MANAGER_ADDRESS=<PASTE_MANAGER_ADDRESS_HERE>" > .env.local
 ```
 
 4) Start frontend (Terminal 3)
+
+```bash
+cd frontend/my-app
+npm install
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+## QUT Testnet Setup
+
+Use this flow when you want to deploy and play against QUT testnet instead of the local Hardhat environment.
+
+### Add QUT Testnet to MetaMask
+
+In MetaMask:
+1) Open the network selector -> `Add network` -> `Add a network manually`.
+2) Enter:
+  - Network Name: `QUT Testnet`
+  - New RPC URL: `https://testnet.qutblockchain.club`
+  - Chain ID: `452`
+  - Currency Symbol: `ETH`
+3) Save, then switch MetaMask to `QUT Testnet`.
+
+### Export Deployer Key
+
+Set the private key for the account you want Hardhat to use for deployment:
+
+```bash
+export QUT_TESTNET_PRIVATE_KEY=0xYOUR_PRIVATE_KEY
+```
+
+Do not commit this value or add it to tracked files.
+
+### Deploy Manager to QUT Testnet
+
+```bash
+cd blockchain
+npx hardhat run scripts/deploy-manager-local.ts --network qutTestnet
+```
+
+The deploy script prints:
+- `DEPLOYER=...`
+- `MANAGER_ADDRESS=...`
+
+### Point the Frontend at the Deployed Manager
+
+```bash
+cd frontend/my-app
+echo "VITE_MANAGER_ADDRESS=<PASTE_MANAGER_ADDRESS_HERE>" > .env.local
+```
+
+If you change `.env.local`, restart Vite so the new env value is loaded.
+
+### Start the Frontend
 
 ```bash
 cd frontend/my-app

@@ -34,6 +34,13 @@ export default defineConfig({
       url: configVariable("SEPOLIA_RPC_URL"),
       accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
     },
+    qutTestnet: {
+      type: "http",
+      chainType: "l1",
+      chainId: 452,
+      url: "https://testnet.qutblockchain.club",
+      accounts: [configVariable("QUT_TESTNET_PRIVATE_KEY")],
+    },
   },
   verify: {
     etherscan: {

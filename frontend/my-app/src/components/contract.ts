@@ -1,8 +1,12 @@
-import { BrowserProvider, Contract, ContractTransactionResponse, parseEther, solidityPackedKeccak256 } from "ethers";
+import { BrowserProvider, Contract, ContractTransactionResponse, isAddress, parseEther, solidityPackedKeccak256 } from "ethers";
 
 const MANAGER_ADDRESS = import.meta.env.VITE_MANAGER_ADDRESS;
-const REQUIRED_CHAIN_ID = 11155111n;
-const REQUIRED_NETWORK_NAME = "Sepolia";
+const SUPPORTED_NETWORKS = new Map<bigint, string>([
+  [31337n, "Hardhat Local"],
+  [452n, "QUT Testnet"],
+]);
+const INVALID_MANAGER_ADDRESS_MESSAGE =
+  "Invalid VITE_MANAGER_ADDRESS in frontend env configuration. frontend/my-app/.env.local must contain the deployed Manager contract address, and Vite must be restarted after changing env values.";
 
 // 2. ABIs generated directly from your Solidity source code
 export const MANAGER_ABI = [
@@ -281,9 +285,9 @@ async function getSigner() {
 
   const network = await provider.getNetwork();
 
-  if (network.chainId !== REQUIRED_CHAIN_ID) {
+  if (!SUPPORTED_NETWORKS.has(network.chainId)) {
     throw new Error(
-      `Wrong network selected. Please switch MetaMask to ${REQUIRED_NETWORK_NAME} before playing.`
+      `Wrong network selected. Please switch MetaMask to ${Array.from(SUPPORTED_NETWORKS.values()).join(" or ")} before playing.`
     );
   }
 
@@ -328,6 +332,11 @@ export async function getManagerContract(): Promise<Contract> {
   if (!MANAGER_ADDRESS) {
     throw new Error("Missing VITE_MANAGER_ADDRESS in frontend env configuration");
   }
+
+  if (!isAddress(MANAGER_ADDRESS)) {
+    throw new Error(INVALID_MANAGER_ADDRESS_MESSAGE);
+  }
+
   const signer = await getSigner();
   return new Contract(MANAGER_ADDRESS, MANAGER_ABI, signer);
 }

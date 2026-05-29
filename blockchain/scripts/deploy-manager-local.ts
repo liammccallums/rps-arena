@@ -1,9 +1,14 @@
 import { network } from "hardhat";
 
-const { ethers } = await network.connect();
+const { ethers } = await network.create();
 
-const signers = await ethers.getSigners();
-const deployer = signers[7];
+const [deployer] = await ethers.getSigners();
+
+if (!deployer) {
+	throw new Error(
+		"No deployer signer is available. Configure the selected network with an account before deploying."
+	);
+}
 
 const Manager = await ethers.getContractFactory("Manager", deployer);
 const manager = await Manager.deploy();
