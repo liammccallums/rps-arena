@@ -1,9 +1,13 @@
 import { Box, Heading, Text, Button } from '@chakra-ui/react';
-import type { ContractTransactionResponse } from 'ethers';
+import type { ContractTransactionReceipt, ContractTransactionResponse } from 'ethers';
 import { useState } from 'react';
-import { assignPlayer } from './contract'; // Arrowing to your updated contracts file
+import { assignPlayer, getAssignedMatchFromReceipt } from './contract'; // Arrowing to your updated contracts file
 
-export default function JoinQueue() {
+interface JoinQueueProps {
+  onAssigned: (playerAddress: string, matchAddress: string) => void;
+}
+
+export default function JoinQueue({ onAssigned }: JoinQueueProps) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -14,7 +18,14 @@ export default function JoinQueue() {
       const tx: ContractTransactionResponse = await assignPlayer();
       setMessage(`Transaction sent! Hash: ${tx.hash.slice(0, 6)}...${tx.hash.slice(-4)}. Waiting for block confirmation...`);
       
-      await tx.wait(); // Wait for the transaction to be mined
+      const receipt = await tx.wait() as ContractTransactionReceipt; // Wait for the transaction to be mined
+      const playerAddress = (tx.from ?? '').toLowerCase();
+      const matchAddress = playerAddress ? getAssignedMatchFromReceipt(receipt, playerAddress) : null;
+
+      if (playerAddress && matchAddress) {
+        onAssigned(playerAddress, matchAddress);
+      }
+
       setMessage('Successfully joined the queue! Finding a match...');
       
       // Pro-tip: This is the perfect spot to fire a callback (e.g., onJoined())

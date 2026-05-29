@@ -274,6 +274,14 @@ export default function App() {
     setScreenMessage('');
   };
 
+  const handleQueueAssigned = (assignedPlayerAddress: string, assignedMatchAddress: string): void => {
+    setPlayerAddress(assignedPlayerAddress);
+    setMatchAddress(assignedMatchAddress);
+    setIsPlayer1(null);
+    setCurrentScreen('WAITING_FOR_MATCH');
+    setScreenMessage('Assigned to game lobby! Waiting for a challenger...');
+  };
+
   return (
     <Flex direction="column" align="center" justify="center" minH="100vh" bg="gray.900" color="white" p={4}>
       <Box as="header" mb={8} textAlign="center">
@@ -292,7 +300,7 @@ export default function App() {
       </Box>
 
       <Box as="main" p={6} borderWidth={1} borderRadius="xl" borderColor="gray.700" bg="gray.800" shadow="2xl" minW="md">
-        {currentScreen === 'JOIN' && <JoinQueue />}
+        {currentScreen === 'JOIN' && <JoinQueue onAssigned={handleQueueAssigned} />}
 
         {(currentScreen === 'WAITING_FOR_MATCH' || currentScreen === 'WAITING_FOR_REVEAL') && (
           <Flex direction="column" align="center" justify="center" py={8} textAlign="center">

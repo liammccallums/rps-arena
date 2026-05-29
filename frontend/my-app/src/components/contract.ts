@@ -1,4 +1,4 @@
-import { BrowserProvider, Contract, ContractTransactionResponse, isAddress, parseEther, solidityPackedKeccak256 } from "ethers";
+import { BrowserProvider, Contract, ContractTransactionReceipt, ContractTransactionResponse, Interface, isAddress, parseEther, solidityPackedKeccak256 } from "ethers";
 
 const DEFAULT_MANAGER_ADDRESS = "0xaF6999cF9b9012e5de9413001A65D42488E2Eb0f";
 const MANAGER_ADDRESS = import.meta.env.VITE_MANAGER_ADDRESS ?? DEFAULT_MANAGER_ADDRESS;
@@ -275,6 +275,8 @@ export const MATCH_ABI = [
   }
 ] as const;
 
+const managerInterface = new Interface(MANAGER_ABI);
+
 // 3. Shared connection helpers
 async function getSigner() {
   if (typeof window === "undefined" || !window.ethereum) {
@@ -361,6 +363,34 @@ export async function assignPlayer(): Promise<ContractTransactionResponse> {
   const contract = await getManagerContract();
   const tx = await contract.assignPlayer({ value: parseEther("0.001"), gasLimit: 500000 });
   return tx as ContractTransactionResponse;
+}
+
+export function getAssignedMatchFromReceipt(
+  receipt: ContractTransactionReceipt,
+  playerAddress: string
+): string | null {
+  const normalizedPlayerAddress = playerAddress.toLowerCase();
+
+  for (const log of receipt.logs) {
+    try {
+      const parsedLog = managerInterface.parseLog(log);
+
+      if (parsedLog?.name !== "PlayerAssigned") {
+        continue;
+      }
+
+      const assignedPlayer = String(parsedLog.args.player).toLowerCase();
+      const matchAddress = String(parsedLog.args.matchAddress).toLowerCase();
+
+      if (assignedPlayer === normalizedPlayerAddress) {
+        return matchAddress;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return null;
 }
 
 /**
