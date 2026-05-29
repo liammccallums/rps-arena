@@ -9,6 +9,8 @@ const SUPPORTED_NETWORKS = new Map<bigint, string>([
 const INVALID_MANAGER_ADDRESS_MESSAGE =
   "Invalid VITE_MANAGER_ADDRESS in frontend env configuration. frontend/my-app/.env.local must contain the deployed Manager contract address, and Vite must be restarted after changing env values.";
 
+export const ACTIVE_MANAGER_ADDRESS = MANAGER_ADDRESS;
+
 // 2. ABIs generated directly from your Solidity source code
 export const MANAGER_ABI = [
   {

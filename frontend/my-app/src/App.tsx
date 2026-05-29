@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Box, Flex, Heading, Text, Spinner } from '@chakra-ui/react';
-import { getManagerContract, getMatchContract } from './components/contract';
+import { ACTIVE_MANAGER_ADDRESS, getManagerContract, getMatchContract } from './components/contract';
 import { Contract, ZeroHash } from 'ethers';
 
 // Sub-components
@@ -293,6 +293,9 @@ export default function App() {
             Connected Account: {playerAddress.slice(0, 6)}...{playerAddress.slice(-4)}
           </Text>
         )}
+        <Text fontSize="xs" color="gray.500" mb={4}>
+          Manager Contract: {ACTIVE_MANAGER_ADDRESS.slice(0, 6)}...{ACTIVE_MANAGER_ADDRESS.slice(-4)}
+        </Text>
         <Flex gap={6} justify="center" bg="gray.800" p={3} borderRadius="md" border="1px solid" borderColor="gray.700">
           <Text fontWeight="semibold" color="blue.300">Player Score: {scores.player}</Text>
           <Text fontWeight="semibold" color="red.300">Opponent Score: {scores.opponent}</Text>
