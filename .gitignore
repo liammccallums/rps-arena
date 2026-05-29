@@ -1,0 +1,33 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Hardhat and build outputs
+artifacts
+**/artifacts
+cache
+**/cache
+types
+**/types
+typechain-types
+**/typechain-types
+coverage
+**/coverage
+dist
+**/dist
+bundle
+**/bundle
+
+# Foundry/other local dependency cache
+.deps
+**/.deps
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Misc local outputs
+.gas-snapshot
+snapshots
+.local-dev
