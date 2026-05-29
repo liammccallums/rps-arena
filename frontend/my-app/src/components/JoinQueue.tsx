@@ -19,11 +19,10 @@ export default function JoinQueue({ onAssigned }: JoinQueueProps) {
       setMessage(`Transaction sent! Hash: ${tx.hash.slice(0, 6)}...${tx.hash.slice(-4)}. Waiting for block confirmation...`);
       
       const receipt = await tx.wait() as ContractTransactionReceipt; // Wait for the transaction to be mined
-      const playerAddress = (tx.from ?? '').toLowerCase();
-      const matchAddress = playerAddress ? getAssignedMatchFromReceipt(receipt, playerAddress) : null;
+      const assignment = getAssignedMatchFromReceipt(receipt);
 
-      if (playerAddress && matchAddress) {
-        onAssigned(playerAddress, matchAddress);
+      if (assignment) {
+        onAssigned(assignment.playerAddress, assignment.matchAddress);
       }
 
       setMessage('Successfully joined the queue! Finding a match...');

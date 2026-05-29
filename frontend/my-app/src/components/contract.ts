@@ -366,10 +366,8 @@ export async function assignPlayer(): Promise<ContractTransactionResponse> {
 }
 
 export function getAssignedMatchFromReceipt(
-  receipt: ContractTransactionReceipt,
-  playerAddress: string
-): string | null {
-  const normalizedPlayerAddress = playerAddress.toLowerCase();
+  receipt: ContractTransactionReceipt
+): { playerAddress: string; matchAddress: string } | null {
 
   for (const log of receipt.logs) {
     try {
@@ -379,12 +377,10 @@ export function getAssignedMatchFromReceipt(
         continue;
       }
 
-      const assignedPlayer = String(parsedLog.args.player).toLowerCase();
-      const matchAddress = String(parsedLog.args.matchAddress).toLowerCase();
-
-      if (assignedPlayer === normalizedPlayerAddress) {
-        return matchAddress;
-      }
+      return {
+        playerAddress: String(parsedLog.args.player).toLowerCase(),
+        matchAddress: String(parsedLog.args.matchAddress).toLowerCase(),
+      };
     } catch {
       continue;
     }
