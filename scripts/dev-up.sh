@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_DIR="$ROOT_DIR/.local-dev"
 VITE_PID_FILE="$RUN_DIR/vite.pid"
 VITE_LOG="$RUN_DIR/vite.log"
+FRONTEND_ENV="$ROOT_DIR/frontend/my-app/.env.local"
 
 mkdir -p "$RUN_DIR"
 
@@ -13,11 +14,15 @@ is_running() {
   kill -0 "$pid" >/dev/null 2>&1
 }
 
-run_deploy_and_set_env() {
-  echo "Deploying Manager directly to the live QUT Testnet..."
+deploy_manager_and_set_env() {
+  if [[ -z "${QUT_TESTNET_PRIVATE_KEY:-}" ]]; then
+    echo "QUT_TESTNET_PRIVATE_KEY is required when deploying a new Manager."
+    echo 'Run: export QUT_TESTNET_PRIVATE_KEY="0xYOUR_TESTNET_PRIVATE_KEY"'
+    exit 1
+  fi
+
+  echo "Deploying a new Manager to QUT Testnet..."
   local deploy_output
-  
-  # CHANGED: Changed --network from localhost to qutTestnet
   deploy_output="$(cd "$ROOT_DIR/blockchain" && npx hardhat run scripts/deploy-manager-local.ts --network qutTestnet)"
   echo "$deploy_output"
 
@@ -29,8 +34,21 @@ run_deploy_and_set_env() {
     exit 1
   fi
 
-  echo "Writing frontend env with QUT manager address..."
-  printf 'VITE_MANAGER_ADDRESS=%s\n' "$manager_address" > "$ROOT_DIR/frontend/my-app/.env.local"
+  printf 'VITE_MANAGER_ADDRESS=%s\n' "$manager_address" > "$FRONTEND_ENV"
+  echo "Wrote new QUT Manager address to frontend/my-app/.env.local."
+  echo "For Vercel, set VITE_MANAGER_ADDRESS=$manager_address and trigger a new deployment."
+}
+
+require_existing_manager_env() {
+  if [[ ! -f "$FRONTEND_ENV" ]] || ! grep -q '^VITE_MANAGER_ADDRESS=0x' "$FRONTEND_ENV"; then
+    echo "No local Manager address has been configured."
+    echo "Either create frontend/my-app/.env.local with VITE_MANAGER_ADDRESS=<QUT_MANAGER_ADDRESS>"
+    echo "or deliberately deploy a new Manager with: ./scripts/dev-up.sh --deploy"
+    exit 1
+  fi
+
+  echo "Using existing Manager address from frontend/my-app/.env.local."
+  echo "A new QUT Testnet contract will NOT be deployed."
 }
 
 start_vite() {
@@ -39,22 +57,25 @@ start_vite() {
     return
   fi
 
-  echo "Starting Vite dev server for Wi-Fi testing..."
+  echo "Starting Vite dev server..."
   (
     cd "$ROOT_DIR/frontend/my-app"
-    # Keeping the host flag intact so friends on your Wi-Fi can still load your frontend UI
-    nohup npm run dev -- --host 172.20.10.6 --port 5173 >"$VITE_LOG" 2>&1 &
+    nohup npm run dev -- --host 0.0.0.0 --port 5173 >"$VITE_LOG" 2>&1 &
     echo $! >"$VITE_PID_FILE"
   )
 
   echo "Vite started."
 }
 
-# PIPELINE: Completely removed 'start_hardhat' because the QUT Testnet is already running in the cloud!
-run_deploy_and_set_env
+if [[ "${1:-}" == "--deploy" ]]; then
+  deploy_manager_and_set_env
+else
+  require_existing_manager_env
+fi
+
 start_vite
 
 echo ""
-echo "QUT Testnet Environment is Live."
-echo "Frontend App URL (Share with Wi-Fi peers): http://172.20.10.6:5173"
-echo "Vite log:    $VITE_LOG"
+echo "QUT Testnet frontend is running."
+echo "Local URL: http://localhost:5173"
+echo "Vite log: $VITE_LOG"

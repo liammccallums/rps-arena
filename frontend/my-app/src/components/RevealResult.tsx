@@ -1,6 +1,7 @@
 import { Box, Heading, Flex, Text, Button } from '@chakra-ui/react';
 import { useState } from 'react';
-import { revealMove } from './contract'; // Arrowing to your updated contracts file
+import { revealMove } from './contract';
+import { getErrorMessage } from './errorMessage';
 
 // Explicitly mapping Solidity's Move enum indices for UI labels
 const MOVE_MAP: Record<number, string> = {
@@ -49,9 +50,9 @@ export default function RevealResult({ matchAddress, roundData, onRevealSuccess 
       
       setHasRevealed(true);
       setMessage('Move validated on-chain! Waiting for opponent reveal and round result...');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to reveal move:", error);
-      setMessage(`Error: ${error.reason || error.message || error.toString()}`);
+      setMessage(`Error: ${getErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,7 @@
 import { BrowserProvider, Contract, ContractTransactionResponse, isAddress, parseEther, solidityPackedKeccak256 } from "ethers";
 
 const MANAGER_ADDRESS = import.meta.env.VITE_MANAGER_ADDRESS;
+const QUT_TESTNET_CHAIN_ID = 452n;
 
 // 2. ABIs generated directly from your Solidity source code
 export const MANAGER_ABI = [
@@ -271,15 +272,46 @@ export const MATCH_ABI = [
 // 3. Shared connection helpers
 async function getSigner() {
   if (typeof window === "undefined" || !window.ethereum) {
-    throw new Error("MetaMask not found");
+    throw new Error("MetaMask not found. Install MetaMask and connect a wallet to continue.");
   }
+
   const provider = new BrowserProvider(window.ethereum);
   await provider.send("eth_requestAccounts", []);
+
+  const network = await provider.getNetwork();
+  if (network.chainId !== QUT_TESTNET_CHAIN_ID) {
+    throw new Error(
+      "Wrong network selected. Switch MetaMask to QUT Testnet (chain ID 452) and try again."
+    );
+  }
+
   return await provider.getSigner();
 }
 
-async function assertSignerIsMatchPlayer(matchAddress: string): Promise<Contract> {
+async function assertContractCodeExists(address: string, label: string) {
   const signer = await getSigner();
+  const provider = signer.provider;
+
+  if (!provider) {
+    throw new Error("Unable to access the connected blockchain provider.");
+  }
+
+  const code = await provider.getCode(address);
+  if (code === "0x") {
+    throw new Error(
+      `No ${label} contract exists at ${address} on QUT Testnet. Update VITE_MANAGER_ADDRESS in Vercel after deploying the Manager contract, then redeploy the frontend.`
+    );
+  }
+
+  return signer;
+}
+
+async function assertSignerIsMatchPlayer(matchAddress: string): Promise<Contract> {
+  if (!isAddress(matchAddress)) {
+    throw new Error(`Invalid Match contract address: ${matchAddress}.`);
+  }
+
+  const signer = await assertContractCodeExists(matchAddress, "Match");
   const signerAddress = (await signer.getAddress()).toLowerCase();
   const contract = new Contract(matchAddress, MATCH_ABI, signer);
 
@@ -296,13 +328,13 @@ async function assertSignerIsMatchPlayer(matchAddress: string): Promise<Contract
     p2 === "0x0000000000000000000000000000000000000000"
   ) {
     throw new Error(
-      "This match is no longer active (player slots were reset). It likely already resolved on-chain. Refresh both tabs and rejoin matchmaking."
+      "This match is no longer active. It may already have resolved on-chain. Return to matchmaking and join again."
     );
   }
 
   if (signerAddress !== p1 && signerAddress !== p2) {
     throw new Error(
-      `Connected wallet ${signerAddress} is not a player in this match. Expected ${p1} or ${p2}. Switch MetaMask account for this browser profile and try again.`
+      `Connected wallet ${signerAddress} is not a player in this match. Switch to the wallet used to join matchmaking.`
     );
   }
 
@@ -310,20 +342,20 @@ async function assertSignerIsMatchPlayer(matchAddress: string): Promise<Contract
 }
 
 /**
- * Instantiates the main entry point contract.
+ * Instantiates the main entry point contract on QUT Testnet.
  */
 export async function getManagerContract(): Promise<Contract> {
   if (!MANAGER_ADDRESS) {
-    throw new Error("Missing VITE_MANAGER_ADDRESS in frontend env configuration");
-  }
-
-  if (!isAddress(MANAGER_ADDRESS)) {
     throw new Error(
-      `Invalid VITE_MANAGER_ADDRESS: ${MANAGER_ADDRESS}. Update frontend/my-app/.env.local with the deployed Manager contract address and restart Vite.`
+      "Missing VITE_MANAGER_ADDRESS. Set it to the Manager address deployed on QUT Testnet and rebuild the frontend."
     );
   }
 
-  const signer = await getSigner();
+  if (!isAddress(MANAGER_ADDRESS)) {
+    throw new Error(`Invalid VITE_MANAGER_ADDRESS: ${MANAGER_ADDRESS}.`);
+  }
+
+  const signer = await assertContractCodeExists(MANAGER_ADDRESS, "Manager");
   return new Contract(MANAGER_ADDRESS, MANAGER_ABI, signer);
 }
 
@@ -331,7 +363,11 @@ export async function getManagerContract(): Promise<Contract> {
  * Instantiates a Match contract dynamically using its address.
  */
 export async function getMatchContract(matchAddress: string): Promise<Contract> {
-  const signer = await getSigner();
+  if (!isAddress(matchAddress)) {
+    throw new Error(`Invalid Match contract address: ${matchAddress}.`);
+  }
+
+  const signer = await assertContractCodeExists(matchAddress, "Match");
   return new Contract(matchAddress, MATCH_ABI, signer);
 }
 
@@ -339,13 +375,50 @@ export async function getMatchContract(matchAddress: string): Promise<Contract> 
 // MANAGER CONTRACT METHODS
 // ==========================================
 
+export interface AssignedMatchResult {
+  matchAddress: string;
+  playerAddress: string;
+  transactionHash: string;
+}
+
 /**
- * Joins matchmaking pool by executing assignPlayer and sending the required 0.001 ETH entry fee.
+ * Joins matchmaking and returns the assigned Match address from the confirmed
+ * transaction receipt. Reading the receipt avoids missing a live event when a
+ * wallet is first connected or when MatchStarted fires in the same transaction.
  */
-export async function assignPlayer(): Promise<ContractTransactionResponse> {
+export async function assignPlayer(): Promise<AssignedMatchResult> {
   const contract = await getManagerContract();
-  const tx = await contract.assignPlayer({ value: parseEther("0.001"), gasLimit: 500000 });
-  return tx as ContractTransactionResponse;
+  const signer = await getSigner();
+  const playerAddress = (await signer.getAddress()).toLowerCase();
+
+  const tx: ContractTransactionResponse = await contract.assignPlayer({
+    value: parseEther("0.001"),
+    gasLimit: 500000
+  });
+
+  const receipt = await tx.wait();
+  if (!receipt) {
+    throw new Error("The matchmaking transaction was not confirmed.");
+  }
+
+  for (const log of receipt.logs) {
+    try {
+      const parsedLog = contract.interface.parseLog(log);
+      if (parsedLog?.name === "PlayerAssigned") {
+        return {
+          matchAddress: String(parsedLog.args.matchAddress).toLowerCase(),
+          playerAddress,
+          transactionHash: tx.hash
+        };
+      }
+    } catch {
+      // The transaction also contains events from the assigned Match contract.
+    }
+  }
+
+  throw new Error(
+    "Transaction confirmed but no PlayerAssigned event was found. Confirm the configured Manager address is the QUT Testnet deployment."
+  );
 }
 
 /**
@@ -362,8 +435,6 @@ export async function isActivePlayer(playerAddress: string): Promise<boolean> {
 
 /**
  * Submits the hash commitment of a choice (Rock, Paper, or Scissors).
- * @param matchAddress The contract location for the specific ongoing match
- * @param commitment The keccak256 hash output string
  */
 export async function commitMove(matchAddress: string, commitment: string): Promise<void> {
   const contract = await assertSignerIsMatchPlayer(matchAddress);
@@ -372,10 +443,7 @@ export async function commitMove(matchAddress: string, commitment: string): Prom
 }
 
 /**
- * Reveals a previously committed choice by providing the matching plain text elements.
- * @param matchAddress The contract location for the specific ongoing match
- * @param move Enum index (1 = Rock, 2 = Paper, 3 = Scissors)
- * @param secret Unique salt string used when structuring the initial commitment
+ * Reveals a previously committed choice by providing the matching move and secret.
  */
 export async function revealMove(matchAddress: string, move: number, secret: string): Promise<void> {
   const contract = await assertSignerIsMatchPlayer(matchAddress);
@@ -384,12 +452,7 @@ export async function revealMove(matchAddress: string, move: number, secret: str
 }
 
 /**
- * Generates a keccak256 hash of the player's chosen move and a secret string.
- * This hash is used for committing a move in the game.
- * @param move The player's chosen move (e.g., 1 for Rock, 2 for Paper, 3 for Scissors).
- * @param secret A bytes32 random salt.
- * @param playerAddress The player's wallet address.
- * @returns The keccak256 hash as a bytes32 string.
+ * Generates the same commitment hash that Match.sol validates on reveal.
  */
 export function generateCommitment(move: number, secret: string, playerAddress: string): string {
   return solidityPackedKeccak256(["uint8", "bytes32", "address"], [move, secret, playerAddress]);

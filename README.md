@@ -1,120 +1,67 @@
-# RPS Arena
-### A Blockchain-Powered Commit-Reveal Rock-Paper-Scissors dApp
+# RPS Arena — QUT Testnet Build
 
-## Project Structure
+## Required QUT Testnet deployment setup
 
-- blockchain/: Solidity smart contracts, Hardhat config, scripts, and test suite.
-- frontend/: React + Vite frontend used to join matches and play rounds through MetaMask.
+This version is configured for the QUT Testnet and fixes the frontend state issue caused by relying only on live event listeners. When a player joins, the frontend now reads the `PlayerAssigned` event from the confirmed transaction receipt, stores the assigned Match address in React state, and then checks the on-chain match status. This allows both players to progress even when `MatchStarted` fires before the browser listener is attached.
 
-## Local Test Environment (Quick Runbook)
+### 1. MetaMask network
 
-### Quick Start (Recommended)
+Add and select the following network in each test browser profile:
 
-From the repository root, start everything with one command:
+```text
+Network Name: QUT Testnet
+RPC URL:      https://testnet.qutblockchain.club
+Chain ID:     452
+Currency:     ETH
+```
+
+### 2. Deploy one Manager contract to QUT Testnet
+
+Use a fresh testnet-only wallet. Do not place private keys in source files.
+
+```bash
+cd blockchain
+npm install
+export QUT_TESTNET_PRIVATE_KEY="0xYOUR_QUT_TESTNET_PRIVATE_KEY"
+npx hardhat run scripts/deploy-manager-local.ts --network qutTestnet
+```
+
+Copy the `MANAGER_ADDRESS=0x...` output. The Manager constructor deploys its three Match contracts automatically. Do not redeploy the Manager for every frontend restart, because every new deployment produces a different frontend address.
+
+### 3. Configure the frontend locally
+
+```bash
+cd ../frontend/my-app
+printf 'VITE_MANAGER_ADDRESS=%s\n' '0xYOUR_QUT_MANAGER_ADDRESS' > .env.local
+npm install
+npm run dev
+```
+
+The frontend refuses to send the entry fee unless MetaMask is on chain ID `452` and bytecode exists at the configured Manager address on that chain.
+
+### 4. Configure Vercel
+
+In the Vercel project settings, create or update this environment variable for the environments you use:
+
+```text
+VITE_MANAGER_ADDRESS=0xYOUR_QUT_MANAGER_ADDRESS
+```
+
+Trigger a new deployment after changing the value. The deployed website must be rebuilt to receive a new Vite environment value.
+
+### 5. Optional local convenience script
+
+Start the frontend with an existing `.env.local` address:
 
 ```bash
 ./scripts/dev-up.sh
 ```
 
-Stop everything with one command:
+Only when you intentionally want a new QUT Testnet contract deployment:
 
 ```bash
-./scripts/dev-down.sh
-```
-
-`dev-up.sh` will:
-- start a local Hardhat node
-- deploy `Manager` to localhost
-- write `frontend/my-app/.env.local` with `VITE_MANAGER_ADDRESS`
-- start the Vite frontend
-
-Open the app at `http://127.0.0.1:5173`.
-
-### Add Hardhat Localhost to MetaMask
-
-Before playing, connect MetaMask to the local Hardhat chain.
-
-In MetaMask:
-1) Open the network selector -> `Add network` -> `Add a network manually`.
-2) Enter:
-  - Network Name: `Hardhat Local`
-  - New RPC URL: `http://127.0.0.1:8545`
-  - Chain ID: `31337`
-  - Currency Symbol: `ETH`
-3) Save, then switch MetaMask to `Hardhat Local`.
-
-### Import a Hardhat Test Wallet into MetaMask
-
-When `npx hardhat node` starts, it prints funded test accounts and private keys.
-
-To import one account:
-1) Copy one private key from the `Private Keys` section in the Hardhat terminal.
-2) In MetaMask, click account menu -> `Add account or hardware wallet` -> `Import account`.
-3) Paste the private key and confirm.
-4) Keep MetaMask on the `Hardhat Local` network.
-
-### Manual Setup (Optional)
-
-Use this only if you want to run each component yourself.
-
-1) Start blockchain (Terminal 1)
-
-```bash
-cd blockchain
-npx hardhat node
-```
-
-2) Deploy manager (Terminal 2)
-
-```bash
-cd blockchain
-npx hardhat run scripts/deploy-manager-local.ts --network localhost
-```
-
-3) Set frontend env (Terminal 2)
-
-```bash
-cd frontend/my-app
-echo "VITE_MANAGER_ADDRESS=<PASTE_MANAGER_ADDRESS_HERE>" > .env.local
-```
-
-4) Start frontend (Terminal 3)
-
-```bash
-cd frontend/my-app
-npm install
-npm run dev -- --host 127.0.0.1 --port 5173
-```
-
-### QUT Testnet Setup
-
-To deploy to the QUT testnet instead of the local Hardhat chain:
-
-1) Add the network to MetaMask:
-  - Network Name: `QUT Testnet`
-  - RPC URL: `https://testnet.qutblockchain.club`
-  - Chain ID: `452`
-  - Currency Symbol: `ETH`
-
-2) Export the private key for the account you want Hardhat to use:
-
-```bash
-export QUT_TESTNET_PRIVATE_KEY="0xYOUR_PRIVATE_KEY"
-```
-
-3) Deploy the manager contract:
-
-```bash
-cd blockchain
-npx hardhat run scripts/deploy-manager-local.ts --network qutTestnet
-```
-
-4) Point the frontend at the deployed manager address:
-
-```bash
-cd ../frontend/my-app
-printf 'VITE_MANAGER_ADDRESS=%s\n' "<PASTE_MANAGER_ADDRESS_HERE>" > .env.local
-npm run dev -- --host 127.0.0.1 --port 5173
+export QUT_TESTNET_PRIVATE_KEY="0xYOUR_QUT_TESTNET_PRIVATE_KEY"
+./scripts/dev-up.sh --deploy
 ```
 
 ---

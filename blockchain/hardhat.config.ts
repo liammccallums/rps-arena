@@ -39,7 +39,7 @@ export default defineConfig({
       chainType: "l1",
       chainId: 452,
       url: "https://testnet.qutblockchain.club",
-      accounts: ["f73924d865c5e4eaf96d7e064971a8555bcff7168012a9305d0d824067c23da3"],
+      accounts: [configVariable("QUT_TESTNET_PRIVATE_KEY")],
     },
   },
 });

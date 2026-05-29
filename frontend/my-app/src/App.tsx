@@ -96,7 +96,7 @@ useEffect(() => {
         console.log(`📡 Linked live listeners directly to room: ${targetRoomAddress}`);
 
         // 1. Both players found! Move to Pick Screen
-        matchContract.on('MatchStarted', (_p1: string, _p2: string) => {
+        matchContract.on('MatchStarted', (_p1: string) => {
           console.log("🎲 MatchStarted event detected live!");
           setIsPlayer1(_p1.toLowerCase() === stateRef.current.playerAddress);
           setCurrentScreen('PICK');
@@ -199,7 +199,7 @@ useEffect(() => {
   // ==========================================
   // PARSING LOGIC HELPERS
   // ==========================================
-  const handleRoundResolution = async (winnerAddress: string, p1Score: bigint, p2Score: bigint) => {
+  async function handleRoundResolution(winnerAddress: string, p1Score: bigint, p2Score: bigint) {
     try {
       let isPlayerP1 = stateRef.current.isPlayer1;
       if (isPlayerP1 === null) {
@@ -242,7 +242,7 @@ useEffect(() => {
     } catch (err) {
       console.error("Failed to parse on-chain round outcomes: ", err);
     }
-  };
+  }
 
   const handleNextRoundReady = () => {
     // Clear storage references for the old round and move on
@@ -253,14 +253,23 @@ useEffect(() => {
     setScreenMessage('');
   };
 
-  const handleReset = (): void => {
+
+  const handleAssignedToMatch = (assignedMatchAddress: string, connectedPlayerAddress: string) => {
+    setPlayerAddress(connectedPlayerAddress.toLowerCase());
+    setMatchAddress(assignedMatchAddress.toLowerCase());
+    setIsPlayer1(null);
+    setCurrentScreen('WAITING_FOR_MATCH');
+    setScreenMessage('Assigned to game lobby! Waiting for a challenger...');
+  };
+
+  function handleReset(): void {
     setScores({ player: 0, opponent: 0 });
     setMatchAddress('');
     setIsPlayer1(null);
     setLastRound(null);
     setCurrentScreen('JOIN');
     setScreenMessage('');
-  };
+  }
 
   return (
     <Flex direction="column" align="center" justify="center" minH="100vh" bg="gray.900" color="white" p={4}>
@@ -280,7 +289,7 @@ useEffect(() => {
       </Box>
 
       <Box as="main" p={6} borderWidth={1} borderRadius="xl" borderColor="gray.700" bg="gray.800" shadow="2xl" minW="md">
-        {currentScreen === 'JOIN' && <JoinQueue />}
+        {currentScreen === 'JOIN' && <JoinQueue onAssigned={handleAssignedToMatch} />}
 
         {(currentScreen === 'WAITING_FOR_MATCH' || currentScreen === 'WAITING_FOR_REVEAL') && (
           <Flex direction="column" align="center" justify="center" py={8} textAlign="center">

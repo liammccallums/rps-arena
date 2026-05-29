@@ -2,6 +2,7 @@ import { Box, Heading, Flex, Text, Spinner } from '@chakra-ui/react';
 import { useState } from 'react';
 import { solidityPackedKeccak256, ethers } from 'ethers';
 import { commitMove } from './contract';
+import { getErrorMessage } from './errorMessage';
 
 interface MoveOption {
   id: 'Rock' | 'Paper' | 'Scissors';
@@ -53,9 +54,9 @@ export default function PickMove({ matchAddress, playerAddress, onCommitSuccess 
       if (onCommitSuccess) {
         onCommitSuccess();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to commit move:", error);
-      setMessage(`Error: ${error.reason || error.message || error.toString()}`);
+      setMessage(`Error: ${getErrorMessage(error)}`);
     } finally {
       setLoading(false);
     }
